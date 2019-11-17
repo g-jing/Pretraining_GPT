@@ -36,6 +36,9 @@ from torch.utils.data import DataLoader, Dataset, SequentialSampler, RandomSampl
 from torch.utils.data.distributed import DistributedSampler
 import jsonlines
 
+@todo random position
+@body using torchfly to start random postion. But It may need torchfly tokenizer 
+
 try:
     from torch.utils.tensorboard import SummaryWriter
 except:
@@ -46,6 +49,9 @@ from tqdm import tqdm, trange
 from transformers import (WEIGHTS_NAME, AdamW, get_linear_schedule_with_warmup,
                                   GPT2Config, GPT2LMHeadModel, GPT2Tokenizer,
                                   OpenAIGPTConfig, OpenAIGPTLMHeadModel, OpenAIGPTTokenizer)
+
+# using tokenizer and gpt-small from torchfly
+from torchfly.transformers import UnifiedTokenizer, GPT2SimpleLM, UnifiedGPT2SmallConfig
 
 
 logger = logging.getLogger(__name__)
