@@ -1,15 +1,15 @@
 class Config():
 # if value is None, the value will be the default value in args.  
 
-    train_data_file = "train.jsonl"
-    output_dir = "output"
-    eval_data_file = "eval.jsonl"
+    train_data_file = "train.jsonl" # training dataset
+    output_dir = "output" # The output directory where the model predictions and checkpoints will be written.
+    eval_data_file = "eval.jsonl" # eval dataset
     # model_type = "gpt2"
     # model_name_or_path = 'gpt2' # 'gpt2-medium', 'gpt2-large' if gpu memory enough, choose a bigger one
     # config_name = None # optional when model_name_or_path exist
-    tokenizer_name = None # optional when model_name_or_path exist
-    cache_dir = None # Optional directory to store the pre-trained models downloaded from s3 (instread of the default one)
-    block_size = None # Optional input sequence length after tokenization. "The training dataset will be truncated.
+    # tokenizer_name = None # optional when model_name_or_path exist
+    # cache_dir = None # Optional directory to store the pre-trained models downloaded from s3 (instread of the default one)
+    block_size = 1024 # Optional input sequence length after tokenization. "The training dataset will be truncated.
     
     # true or false
     do_train = True # True
@@ -28,11 +28,11 @@ class Config():
     max_steps = None
     warmup_steps = None
     logging_steps = None
-    save_steps = None
-    save_total_limit = None
+    save_steps = None # save model during training
+    save_total_limit = None # how many model to keeps
 
     # true or false
-    eval_all_checkpoints = None
+    eval_all_checkpoints = True # eval all model 
     no_cuda = False # False
     overwrite_output_dir = True
     overwrite_cache = None
