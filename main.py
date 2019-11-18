@@ -20,6 +20,8 @@ import torch
 from torch.utils.data import DataLoader, Dataset, SequentialSampler, RandomSampler
 from torch.utils.data.distributed import DistributedSampler
 import jsonlines
+from torchfly.criterions import SequenceCrossEntropyLoss
+
 
 try:
     from torch.utils.tensorboard import SummaryWriter
@@ -222,6 +224,8 @@ def train(args, train_dataset, model, tokenizer):
     model.zero_grad()
     train_iterator = trange(int(args.num_train_epochs), desc="Epoch", disable=args.local_rank not in [-1, 0])
     set_seed(args)  # Added here for reproducibility (even between python 2 and 3)
+
+    criterion = SequenceCrossEntropyLoss()
     for _ in train_iterator:
         epoch_iterator = tqdm(train_dataloader, desc="Iteration", disable=args.local_rank not in [-1, 0])
 
@@ -245,10 +249,12 @@ def train(args, train_dataset, model, tokenizer):
             model.train()
 
             outputs = model(inputs, position_ids=positions, mask=mask)
-            breakpoint()
 
-            loss = outputs[0]  # model outputs are always tuple in transformers (see doc)
+            logit = outputs[0]  # model outputs are always tuple in transformers (see doc)
 
+            logit = logit.contiguous()
+            loss = criterion(logit[:, :-1, :], inputs[:, 1:], mask=mask[:, 1:], reduce="batch")
+                        
             if args.n_gpu > 1:
                 loss = loss.mean()  # mean() to average on multi-gpu parallel training
             if args.gradient_accumulation_steps > 1:
@@ -258,6 +264,7 @@ def train(args, train_dataset, model, tokenizer):
                 with amp.scale_loss(loss, optimizer) as scaled_loss:
                     scaled_loss.backward()
             else:
+
                 loss.backward()
 
             tr_loss += loss.item()
@@ -288,7 +295,9 @@ def train(args, train_dataset, model, tokenizer):
                     if not os.path.exists(output_dir):
                         os.makedirs(output_dir)
                     model_to_save = model.module if hasattr(model, 'module') else model  # Take care of distributed/parallel training
-                    model_to_save.save_pretrained(output_dir)
+                    
+                    # TODO find a better save way.
+                    #model_to_save.save_pretrained(output_dir)
                     torch.save(args, os.path.join(output_dir, 'training_args.bin'))
                     logger.info("Saving model checkpoint to %s", output_dir)
 
@@ -319,7 +328,7 @@ def evaluate(args, model, tokenizer, prefix=""):
     args.eval_batch_size = args.per_gpu_eval_batch_size * max(1, args.n_gpu)
     # Note that DistributedSampler samples randomly
     eval_sampler = SequentialSampler(eval_dataset) if args.local_rank == -1 else DistributedSampler(eval_dataset)
-    eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=args.eval_batch_size)
+    eval_dataloader = DataLoader(eval_dataset, collate_fn=eval_dataset.collate, sampler=eval_sampler, batch_size=args.eval_batch_size)
 
     # multi-gpu evaluate
     if args.n_gpu > 1:
@@ -333,15 +342,32 @@ def evaluate(args, model, tokenizer, prefix=""):
     nb_eval_steps = 0
     model.eval()
 
+    criterion = SequenceCrossEntropyLoss()
     for batch in tqdm(eval_dataloader, desc="Evaluating"):
-        inputs, labels = (batch, batch)
+        inputs = batch["input_ids"]
+        positions  = batch["position_ids"] 
+        lengths = batch["length"]
+
+        batch_max_length = torch.max(lengths).item()
+
+        inputs = inputs[:, :batch_max_length]
+        positions = positions[:, :batch_max_length]
+
+        mask = torch.arange(batch_max_length).expand(args.train_batch_size, batch_max_length) < lengths.unsqueeze(1)
+
         inputs = inputs.to(args.device)
-        labels = labels.to(args.device)
+        positions = positions.to(args.device)
+        mask = mask.to(args.device)
+        #labels = labels.to(args.device)
 
         with torch.no_grad():
-            outputs = model(inputs, labels=labels)
-            lm_loss = outputs[0]
-            eval_loss += lm_loss.mean().item()
+            outputs = model(inputs, position_ids=positions, mask=mask)
+            logit = outputs[0]  # model outputs are always tuple in transformers (see doc)
+
+            logit = logit.contiguous()
+            loss = criterion(logit[:, :-1, :], inputs[:, 1:], mask=mask[:, 1:], reduce="batch")
+
+            eval_loss += loss.mean().item()
         nb_eval_steps += 1
 
     eval_loss = eval_loss / nb_eval_steps
@@ -543,8 +569,8 @@ def main():
         # Save a trained model, configuration and tokenizer using `save_pretrained()`.
         # They can then be reloaded using `from_pretrained()`
         model_to_save = model.module if hasattr(model, 'module') else model  # Take care of distributed/parallel training
-        model_to_save.save_pretrained(args.output_dir)
-        tokenizer.save_pretrained(args.output_dir)
+        #model_to_save.save_pretrained(args.output_dir)
+        #tokenizer.save_pretrained(args.output_dir)
 
         # Good practice: save your training arguments together with the trained model
         torch.save(args, os.path.join(args.output_dir, 'training_args.bin'))
@@ -567,7 +593,7 @@ def main():
             global_step = checkpoint.split('-')[-1] if len(checkpoints) > 1 else ""
             prefix = checkpoint.split('/')[-1] if checkpoint.find('checkpoint') != -1 else ""
             
-            model = model_class.from_pretrained(checkpoint)
+            # model = model_class.from_pretrained(checkpoint)
             model.to(args.device)
             result = evaluate(args, model, tokenizer, prefix=prefix)
             result = dict((k + '_{}'.format(global_step), v) for k, v in result.items())

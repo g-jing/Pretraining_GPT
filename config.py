@@ -24,7 +24,7 @@ class Config():
     weight_decay = None
     adam_epsilon = None
     max_grad_norm = None
-    num_train_epochs = None
+    num_train_epochs = 3
     max_steps = None
     warmup_steps = None
     logging_steps = None
@@ -34,7 +34,7 @@ class Config():
     # true or false
     eval_all_checkpoints = None
     no_cuda = False # False
-    overwrite_output_dir = None
+    overwrite_output_dir = True
     overwrite_cache = None
 
     seed = 42
