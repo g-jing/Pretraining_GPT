@@ -3,6 +3,11 @@ from torchfly.transformers import UnifiedTokenizer
 from torchfly.transformers import GPT2SimpleLM
 
 import jsonlines
+
+with jsonlines.open('train.jsonl', mode='w') as writer:
+    obj = ["hello", "hi", "how are you", "I am good", "do you like movies", "No, I don't"]
+    writer.write(obj)
+
 with open("examples.jsonl") as reader:
     example = []
     for obj in reader:

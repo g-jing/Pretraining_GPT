@@ -1,7 +1,5 @@
 """
-Fine-tuning the library models for language modeling on a text file (GPT, GPT-2, BERT, RoBERTa).
-GPT and GPT-2 are fine-tuned using a causal language modeling (CLM) loss while BERT and RoBERTa are fine-tuned
-using a masked language modeling (MLM) loss.
+This python script is used to finetune GPT
 """
 
 from __future__ import absolute_import, division, print_function
@@ -22,7 +20,7 @@ from torch.utils.data.distributed import DistributedSampler
 import jsonlines
 from torchfly.criterions import SequenceCrossEntropyLoss
 
-
+os.environ["CUDA_VISIBLE_DEVICES"]="4"
 try:
     from torch.utils.tensorboard import SummaryWriter
 except:
@@ -39,7 +37,6 @@ from transformers import WarmupLinearSchedule
 
 # using tokenizer and gpt-small from torchfly
 from torchfly.transformers import UnifiedTokenizer, GPT2SimpleLM, UnifiedGPT2SmallConfig
-#TODO required space at the beginning?
 
 logger = logging.getLogger(__name__)
 
@@ -63,9 +60,9 @@ class TextDataset(Dataset):
             with jsonlines.open(file_path) as reader:
                 for obj in reader:
                     one_ABrole_dialogue = ["A:"+obj[idx]+"\n\n\n" if idx%2==0 else "B:"+obj[idx]+"\n\n\n" for idx in range(len(obj))]
+                    
                     one_ABrole_dialogue = "".join(one_ABrole_dialogue)  # join all utterances in one dialogue
                     one_ABrole_dialogue = tokenizer.encode(one_ABrole_dialogue)
-
                     self.examples.append(one_ABrole_dialogue)
 
             #breakpoint()
@@ -107,6 +104,8 @@ class TextDataset(Dataset):
             "position_ids": pos_tensor,
             "length": len_tensor
         }
+
+        breakpoint()
             
         return batch
 
