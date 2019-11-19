@@ -19,7 +19,7 @@ from torch.utils.data.distributed import DistributedSampler
 import jsonlines
 from torchfly.criterions import SequenceCrossEntropyLoss
  
-os.environ["CUDA_VISIBLE_DEVICES"]="4"
+os.environ["CUDA_VISIBLE_DEVICES"]="6, 7"
 try:
    from torch.utils.tensorboard import SummaryWriter
 except:
@@ -44,7 +44,7 @@ class TextDataset(Dataset):
    def __init__(self, tokenizer, configuration, file_path='train', block_size=1024):
        assert os.path.isfile(file_path)
        directory, filename = os.path.split(file_path)
-       cached_features_file = os.path.join(directory, "GPTsmall" + '_cached_lm_' + str(block_size) + '_' + filename)
+       cached_features_file = os.path.join(directory, "GPTsmall" + '_cached_lm_' + filename)
  
        if os.path.exists(cached_features_file):
            logger.info("Loading features from cached file %s", cached_features_file)
@@ -59,11 +59,14 @@ class TextDataset(Dataset):
            with jsonlines.open(file_path) as reader:
                for obj in reader:
                    one_ABrole_dialogue = ["A:"+obj[idx]+"\n\n\n" if idx%2==0 else "B:"+obj[idx]+"\n\n\n" for idx in range(len(obj))]
-                  
                    one_ABrole_dialogue = "".join(one_ABrole_dialogue)  # join all utterances in one dialogue
                    one_ABrole_dialogue = tokenizer.encode(one_ABrole_dialogue)
                    self.examples.append(one_ABrole_dialogue)
- 
+
+           logger.info("Saving features into cached file %s", cached_features_file)
+           with open(cached_features_file, 'wb') as handle:
+               pickle.dump(self.examples, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
            #breakpoint()
                   
  
@@ -73,25 +76,19 @@ class TextDataset(Dataset):
        # sort by length
        inputs = sorted(inputs, key=len, reverse=True)
  
-       # total_len = sum([len(item) for item in inputs[0]])
        batch_len = [len(one) for one in inputs]
  
        batch_input = []
        batch_start_position = []
        for idx in range(batch_size):
            # make random positions
-          
            start_position = random.randint(0, 1024 - batch_len[idx])
- 
-           pos = [pos_idx for pos_idx in range(start_position, start_position+batch_len[idx])]
-  
+           pos = [pos_idx for pos_idx in range(start_position, start_position+batch_len[idx])] 
            zero_pad = torch.LongTensor([0]*1024)
            padded_inputs = torch.cat([inputs[idx], zero_pad], dim=0)
            padded_inputs = padded_inputs[:1024]
- 
            padded_pos = torch.cat([torch.LongTensor(pos), zero_pad], dim=0)
            padded_pos = padded_pos[:1024]
- 
            batch_input.append(padded_inputs)
            batch_start_position.append(padded_pos)
  
@@ -105,18 +102,7 @@ class TextDataset(Dataset):
        }
           
        return batch
- 
- 
-           #for i in range(0, len(tokenized_text)-block_size+1, block_size): # Truncate in block of block_size
-           #    self.examples.append(tokenizer.build_inputs_with_special_tokens(tokenized_text[i:i+block_size]))
-           # Note that we are loosing the last truncated example here for the sake of simplicity (no padding)
-           # If your dataset is small, first you should look for a bigger one :-) and second you
-           # can change this behavior by adding (model specific) padding.
- 
-           #logger.info("Saving features into cached file %s", cached_features_file)
-           #with open(cached_features_file, 'wb') as handle:
-           #    pickle.dump(self.examples, handle, protocol=pickle.HIGHEST_PROTOCOL)
- 
+
    def __len__(self):
        return len(self.examples)
  
@@ -165,6 +151,7 @@ def _rotate_checkpoints(configuration, checkpoint_prefix, use_mtime=False):
        logger.info("Deleting older checkpoint [{}] due to configuration.save_total_limit".format(checkpoint))
        shutil.rmtree(checkpoint)
  
+
 def train(configuration, train_dataset, model, tokenizer):
    """ Train the model """
    if configuration.local_rank in [-1, 0]:
@@ -243,9 +230,10 @@ def train(configuration, train_dataset, model, tokenizer):
            mask = mask.to(configuration.device)
            #labels = labels.to(configuration.device)
            model.train()
- 
+
            outputs = model(inputs, position_ids=positions, mask=mask)
- 
+
+
            logit = outputs[0]  # model outputs are always tuple in transformers (see doc)
  
            logit = logit.contiguous()
@@ -405,8 +393,8 @@ def main():
        ptvsd.wait_for_attach()
  
    # Setup CUDA, GPU & distributed training
-   if configuration.local_rank == -1 or configuration.no_cuda:
-       device = torch.device("cuda" if torch.cuda.is_available() and not configuration.no_cuda else "cpu")
+   if configuration.local_rank == -1:
+       device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
        configuration.n_gpu = torch.cuda.device_count()
    else:  # Initializes the distributed backend which will take care of sychronizing nodes/GPUs
        torch.cuda.set_device(configuration.local_rank)
