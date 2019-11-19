@@ -3,25 +3,15 @@ from torchfly.transformers import UnifiedTokenizer
 from torchfly.transformers import GPT2SimpleLM
 
 import jsonlines
+import json
 
-with jsonlines.open('train.jsonl', mode='w') as writer:
-    obj = ["hello", "hi", "how are you", "I am good", "do you like movies", "No, I don't"]
-    writer.write(obj)
 
-with open("examples.jsonl") as reader:
+with open("../train.jsonl") as reader:
     example = []
+    i = 0
     for obj in reader:
-        example.append(obj)
-
-assert len(example) == 1
-train_set = [example[0] for i in range(1000)]
-eval_set = [example[0] for i in range(1000)]
-
-with jsonlines.open('train.jsonl', mode='w') as writer:
-    for obj in train_set:
-        writer.write(obj)
-        
-
-with jsonlines.open('eval.jsonl', mode='w') as writer:
-    for obj in eval_set:
-        writer.write(obj)
+        i += 1
+        example.append(json.loads(obj))
+        if i==5:
+            break
+breakpoint()
