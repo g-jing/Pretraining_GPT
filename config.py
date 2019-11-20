@@ -2,6 +2,8 @@ class Config():
 # if value is None, the value will be the default value in args.  
     def __init__(self):
 
+        self.train_batch_size = 8
+
         self.total_datum = 140000000
         self.step_per_batch = 10000
         self.gpu_count = 8
@@ -22,7 +24,7 @@ class Config():
         self.per_gpu_train_batch_size = 8 # or 16 # depends on total step
         self.per_gpu_eval_batch_size = 8 # at large as possible # depends on gpu memory
         self.gradient_accumulation_steps = 1 # depend on total step
-        self.learning_rate = 1e-5 #TODO these hp, ask qingyang wu
+        self.learning_rate = 1e-5
         self.weight_decay = 0.01
         self.adam_epsilon = 1e-6 
         self.max_grad_norm = 1.0

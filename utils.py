@@ -19,12 +19,7 @@ def parse_args(argv=None):
         type=str,       
         help="The input training data file (a text file)."
     )
-    parser.add_argument(
-        "--eval_data_file", 
-        default="eval.jsonl", 
-        type=str,                       
-        help="An optional input evaluation data file to evaluate the perplexity on (a text file)."
-    )
+
     parser.add_argument(
         "--block_size", 
         default=1024, 
@@ -38,22 +33,22 @@ def parse_args(argv=None):
         help="The initial learning rate for AdamW."
     )
     parser.add_argument(
-        "--batch_size", default=1, type=int, help="Set the batch size"
+        "--batch_size", default=8, type=int, help="Set the batch size"
     )
     parser.add_argument(
-        "--num_train_epochs",
-        default=3,
+        "--fake_num_train_epochs",
+        default=10,
         type=int,
         help="Total number of training epochs to perform."
     )
     parser.add_argument(
         "--constant_save_time",
-        default=60,
+        default=3600 *4,
         type=int,
         help="time interval to save extra model"
     )
     parser.add_argument(
-        "--max_grad_norm", default=5.0, type=float, help="Max gradient norm."
+        "--max_grad_norm", default=1.0, type=float, help="Max gradient norm."
     )
     # warmup settings
     parser.add_argument(
@@ -85,7 +80,7 @@ def parse_args(argv=None):
     parser.add_argument(
         '--save_steps',
         type=int,
-        default=50,
+        default=100000,
         help="Save checkpoint every X updates steps."
     )
     parser.add_argument(

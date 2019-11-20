@@ -134,9 +134,9 @@ class TextDataset(Dataset):
      return torch.tensor(self.examples[item])
  
  
-def load_and_cache_examples(args, tokenizer, evaluate=False):
+def load_and_cache_examples(args, tokenizer):
  dataset = TextDataset(tokenizer, args,
-                       file_path=args.eval_data_file if evaluate else args.train_data_file, block_size=args.block_size)
+                       file_path=args.train_data_file, block_size=args.block_size)
  return dataset
  
  
@@ -166,8 +166,7 @@ def main():
    # define the tokenizer
    tokenizer = UnifiedTokenizer()
  
-   train_dataset = load_and_cache_examples(
-       args, tokenizer, evaluate=False)
+   train_dataset = load_and_cache_examples(args, tokenizer)
  
    if args.local_rank == -1:
        train_sampler = RandomSampler(train_dataset)
@@ -175,19 +174,19 @@ def main():
        train_sampler = DistributedSampler(train_dataset)
  
    train_dataloader = DataLoader(dataset=train_dataset,
-                                   sampler=train_sampler,
-                                   batch_size=args.batch_size,
-                                   collate_fn=train_dataset.collate)
+                                sampler=train_sampler,
+                                batch_size=args.batch_size,
+                                collate_fn=train_dataset.collate)
  
    # define the model
    model = GPT2SimpleLM(config=UnifiedGPT2SmallConfig)
- 
-   num_train_optimization_steps = (len(train_dataset) *
-                                   args.num_train_epochs //
-                                   args.batch_size //
-                                   args.gradient_accumulation_steps //
-                                   args.n_gpu)
- 
+    
+   num_train_optimization_steps_per_epoch = 10000
+   args.gradient_accumulation_steps = (len(train_dataset) //
+                                    args.batch_size //
+                                    num_train_optimization_steps_per_epoch //
+                                    args.n_gpu)
+   #print("gpu: ", args.n_gpu)
    # dialog = dialog_to_tensor(tokenizer, dialog, device)
    optimizer_parameters = get_transformer_optim_params(args, model)
    optimizer = AdamW(optimizer_parameters,
@@ -199,7 +198,7 @@ def main():
  
    scheduler = WarmupLinearSchedule(optimizer,
                                    warmup_steps=args.warmup_steps,
-                                   t_total=num_train_optimization_steps)
+                                   t_total=num_train_optimization_steps_per_epoch * args.fake_num_train_epochs)
  
    manager.init_training(model, optimizer)
  
@@ -233,7 +232,7 @@ def main():
  
    model.train()
    criterion = SequenceCrossEntropyLoss()
-   for ep in range(args.num_train_epochs):
+   for ep in range(2):
        pbar = progress_bar(train_dataloader)
  
        for batch in pbar:
@@ -254,7 +253,6 @@ def main():
            logit = outputs[0]  # model outputs are always tuple in transformers (see doc)
            logit = logit.contiguous()
            loss = criterion(logit[:, :-1, :], inputs[:, 1:], mask=mask[:, 1:], reduce="batch")
- 
  
            manager.backward_loss(loss, model, optimizer)
            update_count += 1

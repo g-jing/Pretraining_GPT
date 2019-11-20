@@ -4,9 +4,10 @@ This python script is used to finetune GPT
  
 from __future__ import absolute_import, division, print_function
  
+import os
+#os.environ['MASTER_PORT'] = '29500'
 import glob
 import logging
-import os
 import pickle
 import random
 import re
@@ -19,7 +20,6 @@ from torch.utils.data.distributed import DistributedSampler
 import jsonlines
 from torchfly.criterions import SequenceCrossEntropyLoss
  
-os.environ["CUDA_VISIBLE_DEVICES"]="6, 7"
 try:
    from torch.utils.tensorboard import SummaryWriter
 except:
@@ -232,10 +232,7 @@ def train(configuration, train_dataset, model, tokenizer):
            model.train()
 
            outputs = model(inputs, position_ids=positions, mask=mask)
-
-
            logit = outputs[0]  # model outputs are always tuple in transformers (see doc)
- 
            logit = logit.contiguous()
            loss = criterion(logit[:, :-1, :], inputs[:, 1:], mask=mask[:, 1:], reduce="batch")
                       
@@ -325,7 +322,7 @@ def evaluate(configuration, model, tokenizer, prefix=""):
    eval_loss = 0.0
    nb_eval_steps = 0
    model.eval()
- 
+    
    criterion = SequenceCrossEntropyLoss()
    for batch in tqdm(eval_dataloader, desc="Evaluating"):
        inputs = batch["input_ids"]
@@ -358,7 +355,8 @@ def evaluate(configuration, model, tokenizer, prefix=""):
    perplexity = torch.exp(torch.tensor(eval_loss))
  
    result = {
-       "perplexity": perplexity
+       "perplexity": perplexity,
+       "eval_loss": eval_loss
    }
  
    output_eval_file = os.path.join(eval_output_dir, prefix, "eval_results.txt")
@@ -399,7 +397,11 @@ def main():
    else:  # Initializes the distributed backend which will take care of sychronizing nodes/GPUs
        torch.cuda.set_device(configuration.local_rank)
        device = torch.device("cuda", configuration.local_rank)
-       torch.distributed.init_process_group(backend='nccl')
+
+       print("before nccl \n")
+       torch.distributed.init_process_group(backend='nccl', init_method='tcp://10.1.1.20:23456', rank=configuration.local_rank, world_size=2)
+       print("after nccl \n")
+
        configuration.n_gpu = 1
    configuration.device = device
  
