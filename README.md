@@ -51,4 +51,9 @@ install allennlp
 
 `pip install allennlp`
 
+# test the model during training
+Run bot.py and chat with the bot. You could use a different model by changing the model location. Default location is Checkpoint/best.pth
+
+# If training is interupted, please find the closest checkpoint and reload model and optimizer. Also, you need to find the rough position of Dataset. Besides, you need to reset the schedule.
+
 
