@@ -24,7 +24,6 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset, SequentialSampler, RandomSampler
 from torch.utils.data.distributed import DistributedSampler
 
-
 from torchfly.utils import init_logging
 from torchfly.modules.losses import SequenceCrossEntropyLoss
 from torchfly.utils.model_utils import get_pretrained_states
@@ -33,18 +32,13 @@ from torchfly.text.tokenizers import UnifiedBPETokenizer
 from distributed_utils import DistributedManager
 from utils import parse_args, freeze_model, get_transformer_optim_params
 
-
 try:
     from torch.utils.tensorboard import SummaryWriter
 except:
     from tensorboardX import SummaryWriter
 
-
-
-
 from transformers import AdamW
 from transformers import WarmupLinearSchedule
-
 
 # using tokenizer and gpt-small from torchfly
 from torchfly.modules.transformers import GPT2SimpleLM, UnifiedGPT2SmallConfig
