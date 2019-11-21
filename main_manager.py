@@ -181,11 +181,12 @@ def main():
    # define the model
    model = GPT2SimpleLM(config=UnifiedGPT2SmallConfig)
     
-   num_train_optimization_steps_per_epoch = 10000
+   num_train_optimization_steps_per_epoch = 10000 // 10000
    args.gradient_accumulation_steps = (len(train_dataset) //
                                     args.batch_size //
                                     num_train_optimization_steps_per_epoch //
                                     args.n_gpu)
+
    #print("gpu: ", args.n_gpu)
    # dialog = dialog_to_tensor(tokenizer, dialog, device)
    optimizer_parameters = get_transformer_optim_params(args, model)
@@ -194,7 +195,7 @@ def main():
  
    if args.warmup_steps < 0:
        args.warmup_steps = int(
-           args.warmup_ratio * len(train_dataset))
+           args.warmup_ratio * num_train_optimization_steps_per_epoch * args.fake_num_train_epochs) #TODO train_dataset or total_step?
  
    scheduler = WarmupLinearSchedule(optimizer,
                                    warmup_steps=args.warmup_steps,
@@ -225,8 +226,6 @@ def main():
            num_serialized_models_to_keep=-1)
        writer = SummaryWriter()
        start = time.time()
-       loss = 0.0
-
        constant_start = time.time()
 
  
@@ -262,8 +261,6 @@ def main():
                optimizer.step()
                scheduler.step()
                optimizer.zero_grad()
- 
-               #print(update_count)
  
                # timer
                if manager.is_main_rank():
