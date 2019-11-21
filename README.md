@@ -56,4 +56,13 @@ Run bot.py and chat with the bot. You could use a different model by changing th
 # Retrain
 If training is interupted, please find the closest checkpoint and reload model and optimizer. Also, you need to find the rough position of Dataset. Besides, you need to reset the schedule.
 
+# Next
+1. using hdf5 or other methods to make the model train on limited cpu memory condition
+https://towardsdatascience.com/hdf5-datasets-for-pytorch-631ff1d750f5
+
+2. multiwoz, persuasion, camerest
+
+3. double roles training or single roles training
+
+4. randomlize start positions
 

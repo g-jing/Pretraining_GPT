@@ -38,8 +38,8 @@ def parse_args(argv=None):
     parser.add_argument(
         '--gradient_accumulation_steps',
         type=int,
-        default=5,
-        help="Number of updates steps to accumulate before performing a backward/update pass."
+        default=200,
+        help="this is calculated by 10000/n_gpu/batch_size  Number of updates steps to accumulate before performing a backward/update pass."
     )
     parser.add_argument(
         "--num_train_epochs",
@@ -49,7 +49,7 @@ def parse_args(argv=None):
     )
     parser.add_argument(
         "--early_stop_num_train_epochs",
-        default=2,
+        default=4,
         type=int,
         help="early stop epoches."
     )
