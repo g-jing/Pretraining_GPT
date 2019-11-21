@@ -4,7 +4,6 @@ This python script is used to finetune GPT
 
 from __future__ import absolute_import, division, print_function
 
-
 import os
 import glob
 import logging
@@ -12,42 +11,50 @@ import pickle
 import random
 import re
 import shutil
-import torch
-import torch.nn as nn
-from torchfly.utils import get_pretrained, init_logging
+import tqdm
+from tqdm import trange
+import jsonlines
+import time
+import json
 
+from allennlp.training.checkpointer import Checkpointer
 import numpy as np
 import torch
+import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset, SequentialSampler, RandomSampler
 from torch.utils.data.distributed import DistributedSampler
-import jsonlines
-from torchfly.criterions import SequenceCrossEntropyLoss
+
+
+from torchfly.utils import init_logging
+from torchfly.modules.losses import SequenceCrossEntropyLoss
+from torchfly.utils.model_utils import get_pretrained_states
+from torchfly.text.tokenizers import UnifiedBPETokenizer
+
 from distributed_utils import DistributedManager
 from utils import parse_args, freeze_model, get_transformer_optim_params
-from allennlp.training.checkpointer import Checkpointer
-import time
+
 
 try:
     from torch.utils.tensorboard import SummaryWriter
 except:
     from tensorboardX import SummaryWriter
 
-import tqdm
-from tqdm import trange
 
-from transformers import (WEIGHTS_NAME, AdamW,
-                          GPT2Config, GPT2LMHeadModel, GPT2Tokenizer,
-                          OpenAIGPTConfig, OpenAIGPTLMHeadModel, OpenAIGPTTokenizer)
 
+
+from transformers import AdamW
 from transformers import WarmupLinearSchedule
 
 
 # using tokenizer and gpt-small from torchfly
-from torchfly.transformers import UnifiedTokenizer, GPT2SimpleLM, UnifiedGPT2SmallConfig
-init_logging()
+from torchfly.modules.transformers import GPT2SimpleLM, UnifiedGPT2SmallConfig
+from torchfly.text.tokenizers import UnifiedBPETokenizer
+from torchfly.utils import get_pretrained_states
 
+init_logging()
 logger = logging.getLogger(__name__)
 
+pad_index = 1
 
 def batch_to_device(batch, device):
     new_batch = {}
@@ -61,39 +68,14 @@ def batch_to_device(batch, device):
 
 
 class TextDataset(Dataset):
-    def __init__(self, tokenizer, args, file_path='train', block_size=1024):
+    def __init__(self, file_path):
         assert os.path.isfile(file_path)
-        directory, filename = os.path.split(file_path)
-        cached_features_file = os.path.join(
-            directory, "GPTsmall" + '_cached_lm_' + filename)
-
-        if os.path.exists(cached_features_file):
-            logger.info("Loading features from cached file %s",
-                        cached_features_file)
-            with open(cached_features_file, 'rb') as handle:
-                self.examples = pickle.load(handle)
-        else:
-            logger.info("Creating features from dataset file at %s", directory)
-
-            self.examples = []
-
-            # read date
-            with jsonlines.open(file_path) as reader:
-                for obj in tqdm.tqdm(reader):
-                    one_ABrole_dialogue = ["A:"+obj[idx]+"\n\n\n" if idx % 2 ==
-                                           0 else "B:"+obj[idx]+"\n\n\n" for idx in range(len(obj))]
-                    # join all utterances in one dialogue
-                    one_ABrole_dialogue = "".join(one_ABrole_dialogue)
-                    one_ABrole_dialogue = tokenizer.encode(one_ABrole_dialogue)
-                    self.examples.append(one_ABrole_dialogue)
-
-            logger.info("Saving features into cached file %s",
-                        cached_features_file)
-            with open(cached_features_file, 'wb') as handle:
-                pickle.dump(self.examples, handle,
-                            protocol=pickle.HIGHEST_PROTOCOL)
-
-            # breakpoint()
+        logger.info("Loading features from %s",
+                    file_path)
+        self.dataset = []
+        with open(file_path, 'r') as handle:
+            for one in handle:
+                self.dataset.append(json.loads(one))
 
     def collate(self, inputs):
 
@@ -102,6 +84,7 @@ class TextDataset(Dataset):
         inputs = sorted(inputs, key=len, reverse=True)
 
         batch_len = [len(one) for one in inputs]
+        max_len = max(batch_len)
 
         batch_input = []
         batch_start_position = []
@@ -110,35 +93,38 @@ class TextDataset(Dataset):
             start_position = random.randint(0, 1024 - batch_len[idx])
             pos = [pos_idx for pos_idx in range(
                 start_position, start_position+batch_len[idx])]
-            zero_pad = torch.LongTensor([0]*1024)
-            padded_inputs = torch.cat([inputs[idx], zero_pad], dim=0)
-            padded_inputs = padded_inputs[:1024]
-            padded_pos = torch.cat([torch.LongTensor(pos), zero_pad], dim=0)
-            padded_pos = padded_pos[:1024]
+
+            pad_tail = torch.LongTensor([pad_index]*max_len)
+            # pad input to max_len
+            padded_inputs = torch.cat([inputs[idx], pad_tail], dim=0)
+            padded_inputs = padded_inputs[:max_len]
+            # pad position to max_len
+            padded_pos = torch.cat([torch.LongTensor(pos), pad_tail], dim=0)
+            padded_pos = padded_pos[:max_len]
+
+            # append
             batch_input.append(padded_inputs)
             batch_start_position.append(padded_pos)
 
         inputs_tensor = torch.stack(batch_input)
         pos_tensor = torch.stack(batch_start_position)
-        len_tensor = torch.LongTensor(batch_len)
+
         batch = {
             "input_ids": inputs_tensor,
             "position_ids": pos_tensor,
-            "length": len_tensor
         }
 
         return batch
 
     def __len__(self):
-        return len(self.examples)
+        return len(self.dataset)
 
     def __getitem__(self, item):
-        return torch.tensor(self.examples[item])
+        return torch.tensor(self.dataset[item])
 
 
-def load_and_cache_examples(args, tokenizer):
-    dataset = TextDataset(tokenizer, args,
-                          file_path=args.train_data_file, block_size=args.block_size)
+def load_dataset(args):
+    dataset = TextDataset(file_path=args.train_data_file)
     return dataset
 
 
@@ -146,7 +132,6 @@ def set_seed(args):
     random.seed(args.seed)
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
-
     torch.backends.cudnn.deterministic = True
     if args.n_gpu > 0:
         torch.cuda.manual_seed_all(args.seed)
@@ -154,21 +139,14 @@ def set_seed(args):
 
 def main():
 
-    #from config import Config
-    #args = Config()
-
     args = parse_args()
-
     args.checkpoint_dir_constant_time = args.checkpoint_dir + "_constant_time"
-
     manager = DistributedManager(args)
 
-    print("local rank:", args.local_rank)
-
     # define the tokenizer
-    tokenizer = UnifiedTokenizer()
+    tokenizer = UnifiedBPETokenizer()
 
-    train_dataset = load_and_cache_examples(args, tokenizer)
+    train_dataset = load_dataset(args)
 
     if args.local_rank == -1:
         train_sampler = RandomSampler(train_dataset)
@@ -181,27 +159,26 @@ def main():
                                   collate_fn=train_dataset.collate)
 
     # define the model
+
     model = GPT2SimpleLM(config=UnifiedGPT2SmallConfig)
+    model.load_state_dict(get_pretrained_states("unified-gpt2-small"))
 
-    num_train_optimization_steps_per_epoch = 10000 // 10000
-    args.gradient_accumulation_steps = (len(train_dataset) //
-                                        args.batch_size //
-                                        num_train_optimization_steps_per_epoch //
-                                        args.n_gpu)
+    total_optimization_step = (len(train_dataset) *
+                              args.num_train_epochs // args.batch_size //
+                              args.gradient_accumulation_steps //
+                              args.n_gpu)
 
-    #print("gpu: ", args.n_gpu)
-    # dialog = dialog_to_tensor(tokenizer, dialog, device)
     optimizer_parameters = get_transformer_optim_params(args, model)
     optimizer = AdamW(optimizer_parameters,
                       lr=args.learning_rate, eps=1e-06)
 
     if args.warmup_steps < 0:
         args.warmup_steps = int(
-            args.warmup_ratio * num_train_optimization_steps_per_epoch * args.fake_num_train_epochs)  # TODO train_dataset or total_step?
+            args.warmup_ratio * total_optimization_step)
 
     scheduler = WarmupLinearSchedule(optimizer,
                                      warmup_steps=args.warmup_steps,
-                                     t_total=num_train_optimization_steps_per_epoch * args.fake_num_train_epochs)
+                                     t_total=total_optimization_step)
 
     manager.init_training(model, optimizer)
 
@@ -226,25 +203,22 @@ def main():
             args.checkpoint_dir_constant_time,
             keep_serialized_model_every_num_seconds=None,
             num_serialized_models_to_keep=-1)
+
         writer = SummaryWriter()
         start = time.time()
         constant_start = time.time()
 
     model.train()
     criterion = SequenceCrossEntropyLoss()
-    for ep in range(2):
+    for ep in range(args.early_stop_num_train_epochs):
         pbar = progress_bar(train_dataloader)
 
         for batch in pbar:
             inputs = batch["input_ids"]
             positions = batch["position_ids"]
-            lengths = batch["length"]
             batch_size = inputs.shape[0]
-            batch_max_length = torch.max(lengths).item()
-            inputs = inputs[:, :batch_max_length]
-            positions = positions[:, :batch_max_length]
-            mask = torch.arange(batch_max_length).expand(
-                batch_size, batch_max_length)
+
+            mask = inputs != pad_index
 
             inputs = inputs.to(args.device)
             positions = positions.to(args.device)
@@ -253,9 +227,8 @@ def main():
             outputs = model(inputs, position_ids=positions, mask=mask)
             # model outputs are always tuple in transformers (see doc)
             logit = outputs[0]
-            logit = logit.contiguous()
-            loss = criterion(logit[:, :-1, :], inputs[:, 1:],
-                             mask=mask[:, 1:], reduce="batch")
+            loss = criterion(logit[:, :-1, :].contiguous(), inputs[:, 1:].contiguous(),
+                             mask=mask[:, 1:].contiguous().float(), reduce="batch")
 
             manager.backward_loss(loss, model, optimizer)
             update_count += 1
