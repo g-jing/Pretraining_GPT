@@ -1,0 +1,8 @@
+GPTsmall_cached_lm_train.jsonl
+train.jsonl
+
+**/__pycache__/**
+*.swp
+*.swo
+
+
