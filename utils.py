@@ -17,7 +17,7 @@ def parse_args(argv=None):
         "--train_data_file",
         default="train.jsonl",
         type=str,       
-        help="The input training data file (a text file)."
+        help="The input training data file (a text file). It should be a jsonlines file"
     )
 
     parser.add_argument(
@@ -28,18 +28,30 @@ def parse_args(argv=None):
     )
     parser.add_argument(
         "--learning_rate",
-        default=1e-4,
+        default=1e-5,
         type=float,
         help="The initial learning rate for AdamW."
     )
     parser.add_argument(
-        "--batch_size", default=8, type=int, help="Set the batch size"
+        "--batch_size", default=6, type=int, help="Set the batch size"
     )
     parser.add_argument(
-        "--fake_num_train_epochs",
+        '--gradient_accumulation_steps',
+        type=int,
+        default=5,
+        help="Number of updates steps to accumulate before performing a backward/update pass."
+    )
+    parser.add_argument(
+        "--num_train_epochs",
         default=10,
         type=int,
         help="Total number of training epochs to perform."
+    )
+    parser.add_argument(
+        "--early_stop_num_train_epochs",
+        default=2,
+        type=int,
+        help="early stop epoches."
     )
     parser.add_argument(
         "--constant_save_time",
@@ -63,13 +75,6 @@ def parse_args(argv=None):
         type=float,
         help="Ratio of warmup steps in terms of the training set"
     )
-    parser.add_argument(
-        '--gradient_accumulation_steps',
-        type=int,
-        default=1,
-        help=
-        "Number of updates steps to accumulate before performing a backward/update pass."
-    )
     # logging
     parser.add_argument(
         '--logging_steps',
@@ -80,7 +85,7 @@ def parse_args(argv=None):
     parser.add_argument(
         '--save_steps',
         type=int,
-        default=100000,
+        default=5000,
         help="Save checkpoint every X updates steps."
     )
     parser.add_argument(
@@ -92,7 +97,7 @@ def parse_args(argv=None):
     # fp 16 training
     parser.add_argument(
         '--fp16',
-        action='store_false',
+        action='store_true',
         help="Whether to use 16-bit (mixed) precision (through NVIDIA apex)"
     )
     parser.add_argument(

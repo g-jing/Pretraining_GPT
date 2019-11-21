@@ -2,6 +2,12 @@ from transformers import GPT2Tokenizer, GPT2LMHeadModel
 from torchfly.transformers import UnifiedTokenizer
 from torchfly.transformers import GPT2SimpleLM
 
+with open("GPTsmall_cached_lm_train.jsonl", "rb") as f:
+    import pickle
+    example = pickle.load(f)
+    breakpoint() 
+
+
 import jsonlines
 import json
 import torch
