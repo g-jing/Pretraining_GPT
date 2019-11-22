@@ -33,23 +33,23 @@ def parse_args(argv=None):
         help="The initial learning rate for AdamW."
     )
     parser.add_argument(
-        "--batch_size", default=6, type=int, help="Set the batch size"
+        "--batch_size", default=4, type=int, help="Set the batch size"
     )
     parser.add_argument(
         '--gradient_accumulation_steps',
         type=int,
-        default=200,
+        default=16,
         help="this is calculated by 10000/n_gpu/batch_size  Number of updates steps to accumulate before performing a backward/update pass."
     )
     parser.add_argument(
         "--num_train_epochs",
-        default=10,
+        default=6,
         type=int,
         help="Total number of training epochs to perform."
     )
     parser.add_argument(
         "--early_stop_num_train_epochs",
-        default=4,
+        default=6,
         type=int,
         help="early stop epoches."
     )
@@ -65,13 +65,13 @@ def parse_args(argv=None):
     # warmup settings
     parser.add_argument(
         "--warmup_steps",
-        default=-1,
+        default=50000,
         type=int,
         help="Total number of training epochs to perform."
     )
     parser.add_argument(
         "--warmup_ratio",
-        default=0.1,
+        default=1/24,
         type=float,
         help="Ratio of warmup steps in terms of the training set"
     )
@@ -85,7 +85,7 @@ def parse_args(argv=None):
     parser.add_argument(
         '--save_steps',
         type=int,
-        default=5000,
+        default=160000,
         help="Save checkpoint every X updates steps."
     )
     parser.add_argument(

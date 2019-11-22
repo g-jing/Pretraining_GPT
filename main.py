@@ -23,6 +23,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset, SequentialSampler, RandomSampler
 from torch.utils.data.distributed import DistributedSampler
+from torch.nn.utils.rnn import pad_sequence
 
 from torchfly.utils import init_logging
 from torchfly.modules.losses import SequenceCrossEntropyLoss
@@ -50,6 +51,57 @@ logger = logging.getLogger(__name__)
 
 pad_index = 1
 
+
+# tokenizer.encode("\n\n\n") [50140, 50118]
+# tokenizer.encode("A:")
+# [250, 35]
+# tokenizer.encode("B:")
+# [387, 35]
+
+
+def get_AB_mask(batch_dialog):
+    batch_AB_mask = torch.zeros_like(batch_dialog)
+
+    for dialog_index in range(len(batch_dialog)):
+        one_dialog = batch_dialog[dialog_index]
+
+        # assert first AB start
+        dialog_array = one_dialog.numpy()
+        assert dialog_array[0] == 250 or dialog_array[0] == 387
+        assert dialog_array[1] == 35
+
+        one_index = [0]
+
+        # get later AB start
+        for idx in range(2, len(dialog_array)-3):
+            if list(dialog_array[idx:idx+4]) == [50140, 50118, 387, 35] or list(dialog_array[idx:idx+4]) == [50140, 50118, 250, 35]:
+                one_index.append(idx+2)
+        one_index.append(len(dialog_array))
+
+        # mask
+        for idx in range(len(one_index)-1):
+            if idx % 2 == 0:
+                start = one_index[idx]
+                end = one_index[idx+1]
+
+                batch_AB_mask[dialog_index][start:end] = 1
+
+        # random
+        if random.random()>0.5:
+            batch_AB_mask[dialog_index] = 1 - batch_AB_mask[dialog_index]
+
+    mask = batch_dialog != 1
+    batch_AB_mask = batch_AB_mask.float() * mask.float()
+
+    #print(batch_AB_mask)
+    #print("*"*10)
+    #print(batch_dialog)
+    
+    #exit(0)
+
+    return batch_AB_mask
+
+
 def batch_to_device(batch, device):
     new_batch = {}
     for key, value in batch.items():
@@ -71,41 +123,46 @@ class TextDataset(Dataset):
             for one in handle:
                 self.dataset.append(json.loads(one))
 
+        # 
+        self.A_start_ids = [250, 35]
+        self.ending = [50140, 50118]
+
     def collate(self, inputs):
+
+        inputs, AB_mask =  zip(*inputs)
 
         batch_size = len(inputs)
         # sort by length
         inputs = sorted(inputs, key=len, reverse=True)
 
         batch_len = [len(one) for one in inputs]
-        max_len = max(batch_len)
 
         batch_input = []
         batch_start_position = []
         for idx in range(batch_size):
             # make random positions
             start_position = random.randint(0, 1024 - batch_len[idx])
-            pos = [pos_idx for pos_idx in range(
-                start_position, start_position+batch_len[idx])]
+            pos = [pos_idx for pos_idx in range(start_position, start_position+batch_len[idx])]
+            batch_start_position.append(torch.LongTensor(pos))
+        
+        inputs_tensor = pad_sequence(inputs, batch_first=True, padding_value=1)
+        pos_tensor = pad_sequence(batch_start_position, batch_first=True, padding_value=1)
 
-            pad_tail = torch.LongTensor([pad_index]*max_len)
-            # pad input to max_len
-            padded_inputs = torch.cat([inputs[idx], pad_tail], dim=0)
-            padded_inputs = padded_inputs[:max_len]
-            # pad position to max_len
-            padded_pos = torch.cat([torch.LongTensor(pos), pad_tail], dim=0)
-            padded_pos = padded_pos[:max_len]
+        pad_mask = inputs_tensor != pad_index
 
-            # append
-            batch_input.append(padded_inputs)
-            batch_start_position.append(padded_pos)
+        #AB_mask = get_AB_mask(inputs_tensor)
+        AB_mask = pad_sequence(AB_mask, batch_first=True, padding_value=0)
 
-        inputs_tensor = torch.stack(batch_input)
-        pos_tensor = torch.stack(batch_start_position)
-
+        print(inputs_tensor.shape)
+        print(pos_tensor.shape)
+        print(pad_mask.shape)
+        print(AB_mask.shape)
+        exit(0)
         batch = {
             "input_ids": inputs_tensor,
             "position_ids": pos_tensor,
+            "pad_mask": pad_mask,
+            "AB_mask": AB_mask
         }
 
         return batch
@@ -114,7 +171,26 @@ class TextDataset(Dataset):
         return len(self.dataset)
 
     def __getitem__(self, item):
-        return torch.tensor(self.dataset[item])
+        
+        example = self.dataset[item]
+
+        # mask B
+        AB_mask = []
+        if random.random() > 0.5:
+            flag = True
+        else:
+            flag = False
+            
+        AB_mask.append(flag)
+        
+        for i in range(1, len(example)):
+            AB_mask.append(flag)
+
+            if example[i] == self.ending[1]:
+                if example[i - 1] == self.ending[0]:
+                    flag = not flag        
+
+        return torch.LongTensor(self.dataset[item]), torch.FloatTensor(AB_mask)
 
 
 def load_dataset(args):
@@ -177,6 +253,7 @@ def main():
     manager.init_training(model, optimizer)
 
     update_count = 0
+    optimizer_count = 0
     if manager.is_main_rank():
         progress_bar = tqdm.tqdm
     else:
@@ -204,25 +281,25 @@ def main():
 
     model.train()
     criterion = SequenceCrossEntropyLoss()
-    for ep in range(args.early_stop_num_train_epochs):
+    for ep in range(args.num_train_epochs):
         pbar = progress_bar(train_dataloader)
-
         for batch in pbar:
+            
+            batch = batch_to_device(batch, args.device)
             inputs = batch["input_ids"]
             positions = batch["position_ids"]
+            pad_mask = batch["pad_mask"]
+            AB_mask = batch["AB_mask"]
+            
             batch_size = inputs.shape[0]
 
-            mask = inputs != pad_index
-
-            inputs = inputs.to(args.device)
-            positions = positions.to(args.device)
-            mask = mask.to(args.device)
-
-            outputs = model(inputs, position_ids=positions, mask=mask)
+            outputs = model(inputs, position_ids=positions, mask=pad_mask)
             # model outputs are always tuple in transformers (see doc)
             logit = outputs[0]
+
+            # change pad_mask to AB_mask
             loss = criterion(logit[:, :-1, :].contiguous(), inputs[:, 1:].contiguous(),
-                             mask=mask[:, 1:].contiguous().float(), reduce="batch")
+                             mask=AB_mask[:, 1:].contiguous().float(), reduce="batch") / args.gradient_accumulation_steps 
 
             manager.backward_loss(loss, model, optimizer)
             update_count += 1
