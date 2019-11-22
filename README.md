@@ -53,9 +53,13 @@ install allennlp
 # test the model during training
 Run bot.py and chat with the bot. You could use a different model by changing the model location. Default location is Checkpoint/best.pth
 
+# storage
+Model is 500MB, and optimizer is 1000MB.
+Total model: ten nearest model_optimiza plus 1 model/4 hours, making it total round 50 GB.
+
 # Retrain
 If training is interupted, please find the closest checkpoint and reload model and optimizer. Also, you need to find the rough position of Dataset. Besides, you need to reset the schedule.
-
+### Note: one gpu memory overlead will not lead to training crush(but still not acceptable, for lacking a gpu will leads to a need for a different hyperparameter set). Make sure data all GPU are working correctly at all time.
 # Next
 1. using hdf5 or other methods to make the model train on limited cpu memory condition
 https://towardsdatascience.com/hdf5-datasets-for-pytorch-631ff1d750f5
@@ -64,5 +68,7 @@ https://towardsdatascience.com/hdf5-datasets-for-pytorch-631ff1d750f5
 
 3. double roles training or single roles training
 
-4. randomlize start positions
+4. ablation study on randomlize start positions
+
+
 
