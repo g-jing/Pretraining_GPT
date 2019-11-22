@@ -1,5 +1,15 @@
 GPTsmall_cached_lm_train.jsonl
 train.jsonl
+Checkpoint
+Checkpoint_constant_time
+runs
+small_reddit.jsonl
+main_no_args.py
+main_original.py
+test.py
+Untitled.ipynb
+examples.jsonl
+
 
 **/__pycache__/**
 *.swp
