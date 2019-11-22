@@ -93,12 +93,6 @@ def get_AB_mask(batch_dialog):
     mask = batch_dialog != 1
     batch_AB_mask = batch_AB_mask.float() * mask.float()
 
-    #print(batch_AB_mask)
-    #print("*"*10)
-    #print(batch_dialog)
-    
-    #exit(0)
-
     return batch_AB_mask
 
 
@@ -123,8 +117,6 @@ class TextDataset(Dataset):
             for one in handle:
                 self.dataset.append(json.loads(one))
 
-        # 
-        self.A_start_ids = [250, 35]
         self.ending = [50140, 50118]
 
     def collate(self, inputs):
@@ -145,19 +137,14 @@ class TextDataset(Dataset):
             pos = [pos_idx for pos_idx in range(start_position, start_position+batch_len[idx])]
             batch_start_position.append(torch.LongTensor(pos))
         
-        inputs_tensor = pad_sequence(inputs, batch_first=True, padding_value=1)
-        pos_tensor = pad_sequence(batch_start_position, batch_first=True, padding_value=1)
+        inputs_tensor = pad_sequence(inputs, batch_first=True, padding_value=pad_index)
+        pos_tensor = pad_sequence(batch_start_position, batch_first=True, padding_value=0)
 
         pad_mask = inputs_tensor != pad_index
 
         #AB_mask = get_AB_mask(inputs_tensor)
         AB_mask = pad_sequence(AB_mask, batch_first=True, padding_value=0)
 
-        print(inputs_tensor.shape)
-        print(pos_tensor.shape)
-        print(pad_mask.shape)
-        print(AB_mask.shape)
-        exit(0)
         batch = {
             "input_ids": inputs_tensor,
             "position_ids": pos_tensor,
