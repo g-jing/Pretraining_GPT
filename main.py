@@ -321,7 +321,7 @@ def main():
                         end - start)
                     start = end
                     # show progress
-                    pbar.set_postfix(loss=loss,
+                    pbar.set_postfix(loss=loss.item(),
                                      speed=speed)
 
             # post-processing
