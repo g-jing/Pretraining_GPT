@@ -108,7 +108,7 @@ def batch_to_device(batch, device):
 
 
 class TextDataset(Dataset):
-    def __init__(self, file_path):
+    def __init__(self, manager, file_path):
         assert os.path.isfile(file_path)
         logger.info("Loading features from %s",
                     file_path)
@@ -116,8 +116,13 @@ class TextDataset(Dataset):
         self.dataset = []
         with open(file_path, 'r') as handle:
             total_dialog = 146790395 # only for full reddit data
-            for one in tqdm.tqdm(handle, total=total_dialog):
-                self.dataset.append(json.loads(one))
+
+            if manager.is_main_rank():
+                for one in tqdm.tqdm(handle, total=total_dialog):
+                    self.dataset.append(json.loads(one))
+            else:
+                for one in handle:
+                    self.dataset.append(json.loads(one))
 
         self.ending = [50140, 50118]
 
@@ -183,7 +188,7 @@ class TextDataset(Dataset):
 
 
 def load_dataset(args):
-    dataset = TextDataset(file_path=args.train_data_file)
+    dataset = TextDataset(args.manager, file_path=args.train_data_file)
     return dataset
 
 
@@ -201,11 +206,17 @@ def main():
     args = parse_args()
     args.checkpoint_dir_constant_time = args.checkpoint_dir + "_constant_time"
     manager = DistributedManager(args)
+    args.manager = manager
 
     # define the tokenizer
     tokenizer = UnifiedBPETokenizer()
 
     train_dataset = load_dataset(args)
+
+    torch.distributed.barrier()
+
+    if manager.is_main_rank():
+        print("Load Finished")
 
     if args.local_rank == -1:
         train_sampler = RandomSampler(train_dataset)
@@ -218,7 +229,7 @@ def main():
                                   collate_fn=train_dataset.collate)
 
     # define the model
-
+    UnifiedGPT2SmallConfig.gradient_checkpointing = True
     model = GPT2SimpleLM(config=UnifiedGPT2SmallConfig)
     model.load_state_dict(get_pretrained_states("unified-gpt2-small"))
 
