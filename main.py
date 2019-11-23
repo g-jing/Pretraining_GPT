@@ -112,9 +112,11 @@ class TextDataset(Dataset):
         assert os.path.isfile(file_path)
         logger.info("Loading features from %s",
                     file_path)
+        
         self.dataset = []
         with open(file_path, 'r') as handle:
-            for one in handle:
+            total_dialog = 146790395 # only for full reddit data
+            for one in tqdm.tqdm(handle, total=total_dialog):
                 self.dataset.append(json.loads(one))
 
         self.ending = [50140, 50118]
