@@ -189,7 +189,7 @@ class TextDataset(Dataset):
 
 
 def load_dataset(args):
-    train_file = f"trian_ids_{args.local_rank}.jsonl"
+    train_file = f"train_ids_{args.local_rank}.jsonl"
     dataset = TextDataset(args, args.manager, file_path=train_file)
     return dataset
 
