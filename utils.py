@@ -33,7 +33,7 @@ def parse_args(argv=None):
         help="The initial learning rate for AdamW."
     )
     parser.add_argument(
-        "--batch_size", default=4, type=int, help="Set the batch size"
+        "--batch_size", default=12, type=int, help="Set the batch size"
     )
     parser.add_argument(
         '--gradient_accumulation_steps',
