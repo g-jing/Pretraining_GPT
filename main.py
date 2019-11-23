@@ -108,14 +108,15 @@ def batch_to_device(batch, device):
 
 
 class TextDataset(Dataset):
-    def __init__(self, manager, file_path):
+    def __init__(self, args, manager, file_path):
         assert os.path.isfile(file_path)
         logger.info("Loading features from %s",
                     file_path)
         
         self.dataset = []
+
         with open(file_path, 'r') as handle:
-            total_dialog = 146790395 # only for full reddit data
+            total_dialog = 146790395 // 8 # only for full reddit data
 
             if manager.is_main_rank():
                 for one in tqdm.tqdm(handle, total=total_dialog):
@@ -188,7 +189,8 @@ class TextDataset(Dataset):
 
 
 def load_dataset(args):
-    dataset = TextDataset(args.manager, file_path=args.train_data_file)
+    train_file = f"trian_ids_{args.local_rank}.jsonl"
+    dataset = TextDataset(args, args.manager, file_path=train_file)
     return dataset
 
 
@@ -218,10 +220,12 @@ def main():
     if manager.is_main_rank():
         print("Load Finished")
 
-    if args.local_rank == -1:
-        train_sampler = RandomSampler(train_dataset)
-    else:
-        train_sampler = DistributedSampler(train_dataset)
+    # if args.local_rank == -1:
+    #     train_sampler = RandomSampler(train_dataset)
+    # else:
+    #     train_sampler = DistributedSampler(train_dataset)
+
+    train_sampler = RandomSampler(train_dataset)
 
     train_dataloader = DataLoader(dataset=train_dataset,
                                   sampler=train_sampler,
