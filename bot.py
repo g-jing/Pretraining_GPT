@@ -66,6 +66,9 @@ while True:
         # input and update B's utterance
         user = input("A:")
 
+        if user == "restart":
+            past = None
+            user = input("A:")
         if user == "quit":
             break
 
@@ -96,6 +99,6 @@ while True:
                 break
             sent.append(prev_word)
 
-        print(tokenizer.decode(sent))
+        print("B:" + tokenizer.decode(sent))
         prev_input = torch.LongTensor([ending]).to(device)
         _, past = model(prev_input, past=past)

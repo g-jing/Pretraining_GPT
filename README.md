@@ -17,38 +17,49 @@ https://drive.google.com/open?id=1TC4uliw5QqcL8zeDyfKxwV6E5V0LLTCF
 # install requirement 
 install jsonlines
 
-```pip install jsonlines```
-
+```shell
+pip install jsonlines
+```
 install apex version that modified the error due to cuda version
 
-`git clone https://github.com/qywu/apex`
+```shell
+git clone https://github.com/qywu/apex
 
-`cd apex`
+cd apex
 
-```pip install -v --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" ./```
+pip install -v --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" ./
+```
 
 
 from Qingyang Wu github, install torchfly:
 
-```git clone https://github.com/qywu/TorchFly.git```
+```shell
+git clone https://github.com/qywu/TorchFly.git
 
-```cd TorchFly```
+cd TorchFly
 
-`pip install -e .`
+pip install -e .
 
-`pip install -r requirements.txt`
+pip install -r requirements.txt
+```
 
-install tnesorboard
+install tensorboard
 
-`pip install tensorboard`
+```
+pip install tensorboard
+```
 
 install transformers from huggingface
 
-`pip install transformers`
+```
+pip install transformers
+```
 
 install allennlp
 
-`pip install allennlp`
+```
+pip install allennlp
+```
 
 # test the model during training
 Run bot.py and chat with the bot. You could use a different model by changing the model location. Default location is Checkpoint/best.pth
@@ -69,6 +80,12 @@ https://towardsdatascience.com/hdf5-datasets-for-pytorch-631ff1d750f5
 3. double roles training or single roles training
 
 4. ablation study on randomlize start positions
+
+# pretraining problem
+1. hyperparameter setting maybe not good. It maybe better to use the hyperparameter from microsoft https://github.com/microsoft/DialoGPT/blob/master/LSP_train.py
+they mention lr depends on model size, meaning they tried different lr?
+
+2. data processing more? like deleting n-gram dialogue?
 
 
 

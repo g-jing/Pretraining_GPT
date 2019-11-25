@@ -1,5 +1,5 @@
-train_dir = "train_ids.jsonl"
-length = 146790395 // 8
+train_dir = "small_reddit.jsonl"
+length = 400001 // 8
 with open(train_dir, "r") as f:
     text = f.readlines()
 
