@@ -20,7 +20,7 @@ install jsonlines
 ```shell
 pip install jsonlines
 ```
-install apex version that modified the error due to cuda version
+Install apex version that modified the error due to cuda version
 
 ```shell
 git clone https://github.com/qywu/apex
@@ -33,7 +33,7 @@ pip install -v --no-cache-dir --global-option="--cpp_ext" --global-option="--cud
 
 from Qingyang Wu github, install torchfly:
 
-```shell
+```python
 git clone https://github.com/qywu/TorchFly.git
 
 cd TorchFly
@@ -86,6 +86,10 @@ https://towardsdatascience.com/hdf5-datasets-for-pytorch-631ff1d750f5
 they mention lr depends on model size, meaning they tried different lr?
 
 2. data processing more? like deleting n-gram dialogue?
+
+# Experiemnt
+We will run on three experiments, persuasionforgood, multiwoz and cameres
+
 
 
 
