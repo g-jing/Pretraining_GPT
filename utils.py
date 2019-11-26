@@ -4,7 +4,9 @@ import numpy as np
 import torch
 import torch.nn as nn
 import random
-
+import torch.jit
+import torch.nn as nn
+import torch.nn.functional as F
 
 def parse_args(argv=None):
     """

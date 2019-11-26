@@ -1,0 +1,67 @@
+2019-11-25 23:59:58,460 - __main__ - INFO - Loading features from train_ids_0.jsonl
+  0%|          | 0/18348799 [00:00<?, ?it/s]2019-11-25 23:59:58,468 - __main__ - INFO - Loading features from train_ids_1.jsonl
+  0%|          | 6250/18348799 [00:00<03:24, 89653.14it/s]
+Load Finished
+File exists: /home/jinggu/.cache/torchfly/models/unified-gpt2-medium.pth
+/home/jinggu/.cache/torchfly/models/unified-gpt2-medium.pth
+File exists: /home/jinggu/.cache/torchfly/models/unified-gpt2-medium.pth
+/home/jinggu/.cache/torchfly/models/unified-gpt2-medium.pth
+Process rank: 1, device: cuda:1, n_gpu: 2, distributed training: True, 16-bits training: True
+Selected optimization level O1:  Insert automatic casts around Pytorch functions and Tensor methods.
+
+Defaults for this optimization level are:
+enabled                : True
+opt_level              : O1
+cast_model_type        : None
+patch_torch_functions  : True
+keep_batchnorm_fp32    : None
+master_weights         : None
+loss_scale             : dynamic
+Processing user overrides (additional kwargs that are not None)...
+After processing overrides, optimization options are:
+enabled                : True
+opt_level              : O1
+cast_model_type        : None
+patch_torch_functions  : True
+keep_batchnorm_fp32    : None
+master_weights         : None
+loss_scale             : dynamic
+Process rank: 0, device: cuda:0, n_gpu: 2, distributed training: True, 16-bits training: True
+  0%|          | 0/893 [00:00<?, ?it/s]Traceback (most recent call last):
+  File "main.py", line 335, in <module>
+    main()
+  File "main.py", line 291, in main
+    mask=AB_mask[:, 1:].contiguous().float(), reduce="batch") / args.gradient_accumulation_steps 
+  File "/home/jinggu/.local/lib/python3.7/site-packages/torch/nn/modules/module.py", line 547, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/data/jinggu/Pretraining_GPT/utils.py", line 175, in forward
+    return sequence_cross_entropy_with_logits(logits, targets, mask, label_smoothing, reduce)
+  File "/data/jinggu/Pretraining_GPT/utils.py", line 187, in sequence_cross_entropy_with_logits
+    log_probs_flat = F.log_softmax(logits_flat, dim=-1)
+NameError: name 'F' is not defined
+Traceback (most recent call last):
+  File "main.py", line 335, in <module>
+    main()
+  File "main.py", line 291, in main
+    mask=AB_mask[:, 1:].contiguous().float(), reduce="batch") / args.gradient_accumulation_steps 
+  File "/home/jinggu/.local/lib/python3.7/site-packages/torch/nn/modules/module.py", line 547, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/data/jinggu/Pretraining_GPT/utils.py", line 175, in forward
+    return sequence_cross_entropy_with_logits(logits, targets, mask, label_smoothing, reduce)
+  File "/data/jinggu/Pretraining_GPT/utils.py", line 187, in sequence_cross_entropy_with_logits
+    log_probs_flat = F.log_softmax(logits_flat, dim=-1)
+NameError: name 'F' is not defined
+  0%|          | 0/893 [00:00<?, ?it/s]
+Traceback (most recent call last):
+  File "/home/jinggu/anaconda3/envs/pretraining_env/lib/python3.7/runpy.py", line 193, in _run_module_as_main
+    "__main__", mod_spec)
+  File "/home/jinggu/anaconda3/envs/pretraining_env/lib/python3.7/runpy.py", line 85, in _run_code
+    exec(code, run_globals)
+  File "/home/jinggu/.local/lib/python3.7/site-packages/torch/distributed/launch.py", line 246, in <module>
+    main()
+  File "/home/jinggu/.local/lib/python3.7/site-packages/torch/distributed/launch.py", line 242, in main
+    cmd=cmd)
+subprocess.CalledProcessError: Command '['/home/jinggu/anaconda3/envs/pretraining_env/bin/python', '-u', 'main.py', '--local_rank=1', '--fp16', '--model_size=medium', '--loss_type=all', '--batch_size=7']' returned non-zero exit status 1.
+*****************************************
+Setting OMP_NUM_THREADS environment variable for each process to be 1 in default, to avoid your system being overloaded, please further tune the variable for optimal performance in your application as needed. 
+*****************************************
