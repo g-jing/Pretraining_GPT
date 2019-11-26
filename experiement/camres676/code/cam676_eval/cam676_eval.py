@@ -18,10 +18,10 @@ order_to_number = {
 }
 
 # load data
-with open("/home/qingyang/Desktop/Dialog/TaskOriented/camrest676/data/CamRest676/CamRest676.json") as f:
+with open("cam676_eval/CamRest676.json") as f:
     raw_data = json.loads(f.read().lower())
     
-with open("/home/qingyang/Desktop/Dialog/TaskOriented/camrest676/data/CamRest676/CamRestOTGY.json", "r") as f:
+with open("cam676_eval/CamRestOTGY.json", "r") as f:
     raw_entities = json.load(f)
 
 # get entities

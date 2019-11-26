@@ -6,12 +6,12 @@ import json
 timepat = re.compile("\d{1,2}[:]\d{1,2}")
 pricepat = re.compile("\d{1,3}[.]\d{1,2}")
 
-with open("/home/qingyang/Desktop/Dialog/TaskOriented/multiwoz/yichi_data/recover_mapping.pair", "r") as f:
+with open("yichi_data/recover_mapping.pair", "r") as f:
     recover_replacements = f.readlines()
     recover_replacements = [item.strip() for item in recover_replacements]
 
 
-with open("/home/qingyang/Desktop/Dialog/TaskOriented/multiwoz/yichi_data/mapping.pair", 'r') as fin:
+with open("yichi_data/mapping.pair", 'r') as fin:
     replacements = []
     for line in fin.readlines():
         tok_from, tok_to = line.replace('\n', '').split('\t')
