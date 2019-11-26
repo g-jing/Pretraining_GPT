@@ -50,7 +50,7 @@ model = model.to(device)
 tokenizer = UnifiedBPETokenizer()
 ending = tokenizer.encode("\n\n\n")
 
-model_dir = "Checkpoint/model_state_epoch_160000.th"
+model_dir = "Checkpoint/model_state_epoch_1280000.th"
 model.load_state_dict(torch.load(model_dir))
 
 past = None
