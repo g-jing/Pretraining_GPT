@@ -14,8 +14,14 @@ def parse_args(argv=None):
 
     # add all arguments
     parser.add_argument(
+        "--model_size",
+        default="small",
+        type=str,       
+        help="You could choose small or medium"
+    )
+    parser.add_argument(
         "--train_data_file",
-        default="train.jsonl",
+        default="train_ids.jsonl",
         type=str,       
         help="The input training data file (a text file). It should be a jsonlines file"
     )
@@ -61,6 +67,13 @@ def parse_args(argv=None):
     )
     parser.add_argument(
         "--max_grad_norm", default=1.0, type=float, help="Max gradient norm."
+    )
+    # last utterances loss or all losses
+    parser.add_argument(
+        "--loss_type",
+        default="all",
+        type=str,       
+        help="The loss type, last or all" 
     )
     # warmup settings
     parser.add_argument(

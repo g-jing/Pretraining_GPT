@@ -28,7 +28,10 @@ from torch.nn.utils.rnn import pad_sequence
 from torchfly.utils import init_logging
 from torchfly.modules.losses import SequenceCrossEntropyLoss
 from torchfly.utils.model_utils import get_pretrained_states
+# using tokenizer and gpt-small from torchfly
+from torchfly.modules.transformers import GPT2SimpleLM, UnifiedGPT2SmallConfig, UnifiedGPT2MediumConfig
 from torchfly.text.tokenizers import UnifiedBPETokenizer
+from torchfly.utils import get_pretrained_states
 
 from distributed_utils import DistributedManager
 from utils import parse_args, freeze_model, get_transformer_optim_params
@@ -41,10 +44,6 @@ except:
 from transformers import AdamW
 from transformers import WarmupLinearSchedule
 
-# using tokenizer and gpt-small from torchfly
-from torchfly.modules.transformers import GPT2SimpleLM, UnifiedGPT2SmallConfig
-from torchfly.text.tokenizers import UnifiedBPETokenizer
-from torchfly.utils import get_pretrained_states
 
 init_logging()
 logger = logging.getLogger(__name__)
@@ -59,43 +58,6 @@ pad_index = 1
 # [387, 35]
 
 
-def get_AB_mask(batch_dialog):
-    batch_AB_mask = torch.zeros_like(batch_dialog)
-
-    for dialog_index in range(len(batch_dialog)):
-        one_dialog = batch_dialog[dialog_index]
-
-        # assert first AB start
-        dialog_array = one_dialog.numpy()
-        assert dialog_array[0] == 250 or dialog_array[0] == 387
-        assert dialog_array[1] == 35
-
-        one_index = [0]
-
-        # get later AB start
-        for idx in range(2, len(dialog_array)-3):
-            if list(dialog_array[idx:idx+4]) == [50140, 50118, 387, 35] or list(dialog_array[idx:idx+4]) == [50140, 50118, 250, 35]:
-                one_index.append(idx+2)
-        one_index.append(len(dialog_array))
-
-        # mask
-        for idx in range(len(one_index)-1):
-            if idx % 2 == 0:
-                start = one_index[idx]
-                end = one_index[idx+1]
-
-                batch_AB_mask[dialog_index][start:end] = 1
-
-        # random
-        if random.random()>0.5:
-            batch_AB_mask[dialog_index] = 1 - batch_AB_mask[dialog_index]
-
-    mask = batch_dialog != 1
-    batch_AB_mask = batch_AB_mask.float() * mask.float()
-
-    return batch_AB_mask
-
-
 def batch_to_device(batch, device):
     new_batch = {}
     for key, value in batch.items():
@@ -108,11 +70,13 @@ def batch_to_device(batch, device):
 
 
 class TextDataset(Dataset):
+
     def __init__(self, args, manager, file_path):
         assert os.path.isfile(file_path)
         logger.info("Loading features from %s",
                     file_path)
         
+        self.args = args
         self.dataset = []
 
         with open(file_path, 'r') as handle:
@@ -170,21 +134,33 @@ class TextDataset(Dataset):
         example = self.dataset[item]
 
         # mask B
-        AB_mask = []
-        if random.random() > 0.5:
-            flag = True
-        else:
-            flag = False
-            
-        AB_mask.append(flag)
-        
-        for i in range(1, len(example)):
+
+        if self.args.loss_type == "all":
+            AB_mask = []
+            if random.random() > 0.5:
+                flag = True
+            else:
+                flag = False
+                
             AB_mask.append(flag)
+            
+            for i in range(1, len(example)):
+                AB_mask.append(flag)
 
-            if example[i] == self.ending[1]:
-                if example[i - 1] == self.ending[0]:
-                    flag = not flag        
+                if example[i] == self.ending[1]:
+                    if example[i - 1] == self.ending[0]:
+                        flag = not flag
+        elif self.args.loss_type == "last":
+            AB_mask = [False] * (len(example) - 2) + [True] * 2
 
+            for i in range(len(example)-3, 0, -1):
+                if example[i] == self.ending[1]:
+                    if example[i - 1] == self.ending[0]:
+                        break
+                AB_mask[i] = True
+        else:
+            raise ValueError(self.args.loss_type, " is not correct, use all or last")     
+            
         return torch.LongTensor(self.dataset[item]), torch.FloatTensor(AB_mask)
 
 
@@ -233,9 +209,18 @@ def main():
                                   collate_fn=train_dataset.collate)
 
     # define the model
-    UnifiedGPT2SmallConfig.gradient_checkpointing = True
-    model = GPT2SimpleLM(config=UnifiedGPT2SmallConfig)
-    model.load_state_dict(get_pretrained_states("unified-gpt2-small"))
+
+    if args.model_size == "small":
+        UnifiedGPT2SmallConfig.gradient_checkpointing = True
+        model = GPT2SimpleLM(config=UnifiedGPT2SmallConfig)
+        model.load_state_dict(get_pretrained_states("unified-gpt2-small"))
+    elif args.model_size == "medium":
+        UnifiedGPT2MediumConfig.gradient_checkpointing = True
+        model = GPT2SimpleLM(config=UnifiedGPT2MediumConfig)
+        model.load_state_dict(get_pretrained_states("unified-gpt2-medium"))
+
+    else:
+        raise ValueError(args.model_size, " is not correct, use small or medium")    
 
     total_optimization_step = (len(train_dataset) *
                               args.num_train_epochs // args.batch_size //
@@ -257,7 +242,6 @@ def main():
     manager.init_training(model, optimizer)
 
     update_count = 0
-    optimizer_count = 0
     if manager.is_main_rank():
         progress_bar = tqdm.tqdm
     else:
