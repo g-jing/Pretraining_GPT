@@ -26,7 +26,8 @@ from torch.utils.data.distributed import DistributedSampler
 from torch.nn.utils.rnn import pad_sequence
 
 from torchfly.utils import init_logging
-from torchfly.modules.losses import SequenceCrossEntropyLoss
+# from torchfly.modules.losses import SequenceCrossEntropyLoss
+from utils import SequenceCrossEntropyLoss
 from torchfly.utils.model_utils import get_pretrained_states
 # using tokenizer and gpt-small from torchfly
 from torchfly.modules.transformers import GPT2SimpleLM, UnifiedGPT2SmallConfig, UnifiedGPT2MediumConfig
