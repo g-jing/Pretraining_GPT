@@ -42,7 +42,7 @@ except:
     from tensorboardX import SummaryWriter
 
 from transformers import AdamW
-from transformers import WarmupLinearSchedule
+from transformers import get_linear_schedule_with_warmup
 
 
 init_logging()
@@ -214,10 +214,25 @@ def main():
         UnifiedGPT2SmallConfig.gradient_checkpointing = True
         model = GPT2SimpleLM(config=UnifiedGPT2SmallConfig)
         model.load_state_dict(get_pretrained_states("unified-gpt2-small-fp16"), strict=False)
+
+        original_model = GPT2SimpleLM(UnifiedGPT2SmallConfig)
+        original_model.load_state_dict(get_pretrained_states("unified-gpt2-small-fp16"), strict=False)
+        print(original_model)
+        utils.freeze_model(original_model)
+        print(original_model)
+        exit(0)
+
     elif args.model_size == "medium":
         UnifiedGPT2MediumConfig.gradient_checkpointing = True
         model = GPT2SimpleLM(config=UnifiedGPT2MediumConfig)
         model.load_state_dict(get_pretrained_states("unified-gpt2-medium-fp16"), strict=False)
+
+        original_model = GPT2SimpleLM(config=UnifiedGPT2MediumConfig)
+        original_model.load_state_dict(get_pretrained_states("unified-gpt2-medium-fp16"), strict=False)
+        print(original_model)
+        utils.freeze_model(original_model)
+        print(original_model)
+        exit(0)
 
     else:
         raise ValueError(args.model_size, " is not correct, use small or medium")    
@@ -236,9 +251,8 @@ def main():
             args.warmup_ratio * total_optimization_step)
 
     scheduler = WarmupLinearSchedule(optimizer,
-                                     warmup_steps=args.warmup_steps,
-                                     t_total=total_optimization_step)
-
+                                     num_warmup_steps=args.warmup_steps,
+                                     num_training_steps=total_optimization_step)
     manager.init_training(model, optimizer)
 
     update_count = 0

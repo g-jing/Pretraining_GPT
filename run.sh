@@ -1,1 +1,1 @@
-CUDA_VISIBLE_DEVICES=2,3 python -m torch.distributed.launch --nproc_per_node=2 main.py --fp16 --model_size="medium" --loss_type="all" --batch_size=7 2>&1 | tee log.txt
+CUDA_VISIBLE_DEVICES=5 python -m torch.distributed.launch --nproc_per_node=1 main.py --fp16 --model_size="medium" --loss_type="all" --batch_size=7 2>&1 | tee log.txt
