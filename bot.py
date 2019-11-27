@@ -13,7 +13,10 @@ from torchfly.utils import init_logging, get_pretrained_states
 from torchfly.utils.model_utils import get_pretrained_states
 from torchfly.text.tokenizers import UnifiedBPETokenizer
 # using tokenizer and gpt-small from torchfly
-from torchfly.modules.transformers import GPT2SimpleLM, UnifiedGPT2SmallConfig
+from torchfly.modules.transformers import GPT2SimpleLM, UnifiedGPT2SmallConfig, UnifiedGPT2MediumConfig
+
+import os
+os.environ["CUDA_VISIBLE_DEVICES"]="1"
 
 def top_filtering(logits, top_k=0, top_p=0.0, filter_value=-float('Inf')):
 
@@ -41,8 +44,9 @@ def top_filtering(logits, top_k=0, top_p=0.0, filter_value=-float('Inf')):
     return logits
 
 
-model = GPT2SimpleLM(config=UnifiedGPT2SmallConfig)
-model.load_state_dict(get_pretrained_states("unified-gpt2-small"))
+# model = GPT2SimpleLM(config=UnifiedGPT2SmallConfig)
+model = GPT2SimpleLM(config=UnifiedGPT2MediumConfig)
+model.load_state_dict(get_pretrained_states("unified-gpt2-medium"))
 device = torch.device("cuda")
 model = model.to(device)
 
@@ -50,7 +54,7 @@ model = model.to(device)
 tokenizer = UnifiedBPETokenizer()
 ending = tokenizer.encode("\n\n\n")
 
-model_dir = "Checkpoint/model_state_epoch_1280000.th"
+model_dir = "medium_best.th"
 model.load_state_dict(torch.load(model_dir))
 
 past = None

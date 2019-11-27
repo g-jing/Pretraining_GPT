@@ -28,7 +28,6 @@ from torch.nn.utils.rnn import pad_sequence
 from torchfly.utils import init_logging
 # from torchfly.modules.losses import SequenceCrossEntropyLoss
 from utils import SequenceCrossEntropyLoss
-from torchfly.utils.model_utils import get_pretrained_states
 # using tokenizer and gpt-small from torchfly
 from torchfly.modules.transformers import GPT2SimpleLM, UnifiedGPT2SmallConfig, UnifiedGPT2MediumConfig
 from torchfly.text.tokenizers import UnifiedBPETokenizer
@@ -138,11 +137,7 @@ class TextDataset(Dataset):
 
         if self.args.loss_type == "all":
             AB_mask = []
-            if random.random() > 0.5:
-                flag = True
-            else:
-                flag = False
-                
+            flag = True
             AB_mask.append(flag)
             
             for i in range(1, len(example)):
@@ -214,11 +209,11 @@ def main():
     if args.model_size == "small":
         UnifiedGPT2SmallConfig.gradient_checkpointing = True
         model = GPT2SimpleLM(config=UnifiedGPT2SmallConfig)
-        model.load_state_dict(get_pretrained_states("unified-gpt2-small"))
+        model.load_state_dict(get_pretrained_states("unified-gpt2-small-fp16"), strict=False)
     elif args.model_size == "medium":
         UnifiedGPT2MediumConfig.gradient_checkpointing = True
         model = GPT2SimpleLM(config=UnifiedGPT2MediumConfig)
-        model.load_state_dict(get_pretrained_states("unified-gpt2-medium"))
+        model.load_state_dict(get_pretrained_states("unified-gpt2-medium-fp16"), strict=False)
 
     else:
         raise ValueError(args.model_size, " is not correct, use small or medium")    
