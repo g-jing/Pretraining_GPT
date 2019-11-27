@@ -137,7 +137,11 @@ class TextDataset(Dataset):
 
         if self.args.loss_type == "all":
             AB_mask = []
-            flag = True
+            if random.random()>0.1:
+                flag = True
+            else:
+                flag = False
+                
             AB_mask.append(flag)
             
             for i in range(1, len(example)):
