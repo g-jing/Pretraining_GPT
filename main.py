@@ -34,7 +34,7 @@ from torchfly.utils import get_pretrained_states
 
 from distributed_utils import DistributedManager
 from utils import parse_args, freeze_model, get_transformer_optim_params, sequence_ce_lm_loss
-from utils import SequenceCrossEntropyLoss
+from utils import SequenceCrossEntropyLoss, TextDataset, load_dataset, set_seed
 import utils
 
 try:
@@ -58,98 +58,6 @@ pad_index = 1
 # [250, 35]
 # tokenizer.encode("B:")
 # [387, 35]
-
-class TextDataset(Dataset):
-
-    def __init__(self, args, manager, file_path):
-        assert os.path.isfile(file_path)
-        logger.info("Loading features from %s",
-                    file_path)
-        
-        self.args = args
-        self.dataset = []
-
-        with open(file_path, 'r') as handle:
-            total_dialog = 146790395 // 8 # only for full reddit data
-
-            if manager.is_main_rank():
-                for one in tqdm.tqdm(handle, total=total_dialog):
-                    self.dataset.append(json.loads(one))
-            else:
-                for one in handle:
-                    self.dataset.append(json.loads(one))
-
-        self.ending = [50140, 50118]
-
-    def collate(self, inputs):
-
-        inputs, AB_mask =  zip(*inputs)
-
-        batch_size = len(inputs)
-        # sort by length
-        inputs = sorted(inputs, key=len, reverse=True)
-
-        batch_len = [len(one) for one in inputs]
-
-        batch_input = []
-        batch_start_position = []
-        for idx in range(batch_size):
-            # make random positions
-            start_position = random.randint(0, 1024 - batch_len[idx])
-            pos = [pos_idx for pos_idx in range(start_position, start_position+batch_len[idx])]
-            batch_start_position.append(torch.LongTensor(pos))
-        
-        inputs_tensor = pad_sequence(inputs, batch_first=True, padding_value=pad_index)
-        pos_tensor = pad_sequence(batch_start_position, batch_first=True, padding_value=0)
-
-        pad_mask = inputs_tensor != pad_index
-
-        #AB_mask = get_AB_mask(inputs_tensor)
-        AB_mask = pad_sequence(AB_mask, batch_first=True, padding_value=0)
-
-        batch = {
-            "input_ids": inputs_tensor,
-            "position_ids": pos_tensor,
-            "pad_mask": pad_mask,
-            "AB_mask": AB_mask
-        }
-
-        return batch
-
-    def __len__(self):
-        return len(self.dataset)
-
-    def __getitem__(self, item):
-        
-        example = self.dataset[item]
-        # if self.args.loss_type == "all":
-        AB_mask = []
-        flag = True  
-        AB_mask.append(flag)
-        
-        for i in range(1, len(example)):
-            AB_mask.append(flag)
-
-            if example[i] == self.ending[1]:
-                if example[i - 1] == self.ending[0]:
-                    flag = not flag
-            
-        return torch.LongTensor(self.dataset[item]), torch.LongTensor(AB_mask)
-
-
-def load_dataset(args):
-    train_file = f"train_ids_{args.local_rank}.jsonl"
-    dataset = TextDataset(args, args.manager, file_path=train_file)
-    return dataset
-
-
-def set_seed(args):
-    random.seed(args.seed)
-    np.random.seed(args.seed)
-    torch.manual_seed(args.seed)
-    torch.backends.cudnn.deterministic = True
-    if args.n_gpu > 0:
-        torch.cuda.manual_seed_all(args.seed)
 
 
 def main():
@@ -260,7 +168,7 @@ def main():
             if manager.is_main_rank():
                 if update_count % args.logging_steps == 0:
                     writer.add_scalar('loss', loss.item(), update_count)
-                    writer.add_scalar('loss', kl.item(), update_count)
+                    writer.add_scalar('kl', kl.item(), update_count)
                     #writer.add_scalar('loss', update_count)
 
                 # saving models
