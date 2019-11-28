@@ -27,14 +27,15 @@ from torch.nn.utils.rnn import pad_sequence
 
 from torchfly.utils import init_logging
 # from torchfly.modules.losses import SequenceCrossEntropyLoss
-from utils import SequenceCrossEntropyLoss
 # using tokenizer and gpt-small from torchfly
-from torchfly.modules.transformers import GPT2SimpleLM, UnifiedGPT2SmallConfig, UnifiedGPT2MediumConfig
+from torchfly.modules.transformers import UnifiedGPT2SmallConfig, UnifiedGPT2MediumConfig
 from torchfly.text.tokenizers import UnifiedBPETokenizer
 from torchfly.utils import get_pretrained_states
 
 from distributed_utils import DistributedManager
-from utils import parse_args, freeze_model, get_transformer_optim_params
+from utils import parse_args, freeze_model, get_transformer_optim_params, sequence_ce_lm_loss
+from utils import SequenceCrossEntropyLoss
+import utils
 
 try:
     from torch.utils.tensorboard import SummaryWriter
@@ -44,30 +45,19 @@ except:
 from transformers import AdamW
 from transformers import get_linear_schedule_with_warmup
 
+from model import HalfARDM
+
 
 init_logging()
 logger = logging.getLogger(__name__)
 
 pad_index = 1
 
-
 # tokenizer.encode("\n\n\n") [50140, 50118]
 # tokenizer.encode("A:")
 # [250, 35]
 # tokenizer.encode("B:")
 # [387, 35]
-
-
-def batch_to_device(batch, device):
-    new_batch = {}
-    for key, value in batch.items():
-        if isinstance(value, list):
-            new_batch[key] = [tensor.to(device) for tensor in value]
-        else:
-            new_batch[key] = value.to(device)
-
-    return new_batch
-
 
 class TextDataset(Dataset):
 
@@ -132,36 +122,19 @@ class TextDataset(Dataset):
     def __getitem__(self, item):
         
         example = self.dataset[item]
-
-        # mask B
-
-        if self.args.loss_type == "all":
-            AB_mask = []
-            if random.random()>0.1:
-                flag = True
-            else:
-                flag = False
-                
+        # if self.args.loss_type == "all":
+        AB_mask = []
+        flag = True  
+        AB_mask.append(flag)
+        
+        for i in range(1, len(example)):
             AB_mask.append(flag)
-            
-            for i in range(1, len(example)):
-                AB_mask.append(flag)
 
-                if example[i] == self.ending[1]:
-                    if example[i - 1] == self.ending[0]:
-                        flag = not flag
-        elif self.args.loss_type == "last":
-            AB_mask = [False] * (len(example) - 2) + [True] * 2
-
-            for i in range(len(example)-3, 0, -1):
-                if example[i] == self.ending[1]:
-                    if example[i - 1] == self.ending[0]:
-                        break
-                AB_mask[i] = True
-        else:
-            raise ValueError(self.args.loss_type, " is not correct, use all or last")     
+            if example[i] == self.ending[1]:
+                if example[i - 1] == self.ending[0]:
+                    flag = not flag
             
-        return torch.LongTensor(self.dataset[item]), torch.FloatTensor(AB_mask)
+        return torch.LongTensor(self.dataset[item]), torch.LongTensor(AB_mask)
 
 
 def load_dataset(args):
@@ -182,15 +155,14 @@ def set_seed(args):
 def main():
 
     args = parse_args()
+
     args.checkpoint_dir_constant_time = args.checkpoint_dir + "_constant_time"
     manager = DistributedManager(args)
     args.manager = manager
 
     # define the tokenizer
     tokenizer = UnifiedBPETokenizer()
-
     train_dataset = load_dataset(args)
-
     torch.distributed.barrier()
 
     if manager.is_main_rank():
@@ -209,34 +181,8 @@ def main():
                                   collate_fn=train_dataset.collate)
 
     # define the model
-
-    if args.model_size == "small":
-        UnifiedGPT2SmallConfig.gradient_checkpointing = True
-        model = GPT2SimpleLM(config=UnifiedGPT2SmallConfig)
-        model.load_state_dict(get_pretrained_states("unified-gpt2-small-fp16"), strict=False)
-
-        original_model = GPT2SimpleLM(UnifiedGPT2SmallConfig)
-        original_model.load_state_dict(get_pretrained_states("unified-gpt2-small-fp16"), strict=False)
-        print(original_model)
-        utils.freeze_model(original_model)
-        print(original_model)
-        exit(0)
-
-    elif args.model_size == "medium":
-        UnifiedGPT2MediumConfig.gradient_checkpointing = True
-        model = GPT2SimpleLM(config=UnifiedGPT2MediumConfig)
-        model.load_state_dict(get_pretrained_states("unified-gpt2-medium-fp16"), strict=False)
-
-        original_model = GPT2SimpleLM(config=UnifiedGPT2MediumConfig)
-        original_model.load_state_dict(get_pretrained_states("unified-gpt2-medium-fp16"), strict=False)
-        print(original_model)
-        utils.freeze_model(original_model)
-        print(original_model)
-        exit(0)
-
-    else:
-        raise ValueError(args.model_size, " is not correct, use small or medium")    
-
+    model = HalfARDM(args)
+ 
     total_optimization_step = (len(train_dataset) *
                               args.num_train_epochs // args.batch_size //
                               args.gradient_accumulation_steps //
@@ -250,7 +196,7 @@ def main():
         args.warmup_steps = int(
             args.warmup_ratio * total_optimization_step)
 
-    scheduler = WarmupLinearSchedule(optimizer,
+    scheduler = get_linear_schedule_with_warmup(optimizer,
                                      num_warmup_steps=args.warmup_steps,
                                      num_training_steps=total_optimization_step)
     manager.init_training(model, optimizer)
@@ -282,28 +228,15 @@ def main():
         constant_start = time.time()
 
     model.train()
-    criterion = SequenceCrossEntropyLoss()
+    
     for ep in range(args.num_train_epochs):
         pbar = progress_bar(train_dataloader)
         for batch in pbar:
             
-            batch = batch_to_device(batch, args.device)
-            inputs = batch["input_ids"]
-            positions = batch["position_ids"]
-            pad_mask = batch["pad_mask"]
-            AB_mask = batch["AB_mask"]
-            
-            batch_size = inputs.shape[0]
+            loss, kl = model.train_one_step(batch)
+            total_loss = loss + 0.01 * kl
 
-            outputs = model(inputs, position_ids=positions, mask=pad_mask)
-            # model outputs are always tuple in transformers (see doc)
-            logit = outputs[0]
-
-            # change pad_mask to AB_mask
-            loss = criterion(logit[:, :-1, :].contiguous(), inputs[:, 1:].contiguous(),
-                             mask=AB_mask[:, 1:].contiguous().float(), reduce="batch") / args.gradient_accumulation_steps 
-
-            manager.backward_loss(loss, model, optimizer)
+            manager.backward_loss(total_loss, model, optimizer)
             update_count += 1
 
             if update_count % args.gradient_accumulation_steps == args.gradient_accumulation_steps - 1:
@@ -320,12 +253,14 @@ def main():
                     start = end
                     # show progress
                     pbar.set_postfix(loss=loss.item(),
+                                    kl=kl.item(),
                                      speed=speed)
 
             # post-processing
             if manager.is_main_rank():
                 if update_count % args.logging_steps == 0:
                     writer.add_scalar('loss', loss.item(), update_count)
+                    writer.add_scalar('loss', kl.item(), update_count)
                     #writer.add_scalar('loss', update_count)
 
                 # saving models

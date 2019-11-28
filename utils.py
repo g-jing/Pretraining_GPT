@@ -8,6 +8,39 @@ import torch.jit
 import torch.nn as nn
 import torch.nn.functional as F
 
+
+def batch_to_device(batch, device):
+    new_batch = {}
+    for key, value in batch.items():
+        if isinstance(value, list):
+            new_batch[key] = [tensor.to(device) for tensor in value]
+        else:
+            new_batch[key] = value.to(device)
+
+    return new_batch
+
+def sequence_ce_lm_loss(
+    logits: torch.FloatTensor,
+    lm_logits: torch.FloatTensor,
+    mask: torch.FloatTensor
+):
+    """
+    Sequence Cross Entropy with Language Model KL
+    """
+
+    # shape : (batch, sequence_length, num_classes)
+    log_probs = torch.log_softmax(logits, dim=-1)
+    lm_probs = torch.softmax(lm_logits, dim=-1)
+
+    # ignored mask and normalized by length
+    lm_kl = (
+        torch.kl_div(input=log_probs, target=lm_probs, reduction=2) /
+        log_probs.shape[1]
+    )
+
+    return lm_kl
+
+
 def parse_args(argv=None):
     """
     Parse the command line arguments
