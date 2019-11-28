@@ -7,6 +7,7 @@ import torch
 import torch.nn as nn
 
 from torchfly.modules.transformers import UnifiedGPT2SmallConfig, UnifiedGPT2MediumConfig, GPT2SimpleLM
+from torchfly.modules.transformers import UnifiedGPT2LargeConfig, UnifiedGPT2XLConfig
 from torchfly.utils import get_pretrained_states
 from GPTRole import GPT2SimpleLMRole
 
@@ -21,21 +22,31 @@ class HalfARDM(nn.Module):
             UnifiedGPT2SmallConfig.gradient_checkpointing = True
             self.model = GPT2SimpleLMRole(config=UnifiedGPT2SmallConfig)
             self.model.load_state_dict(get_pretrained_states("unified-gpt2-small"), strict=False)
-
-            self.original_model = GPT2SimpleLM(UnifiedGPT2SmallConfig)
-            self.original_model.load_state_dict(get_pretrained_states("unified-gpt2-small"), strict=False)
-            utils.freeze_model(self.original_model)
             
         elif args.model_size == "medium":
             self.UnifiedGPT2MediumConfig.gradient_checkpointing = True
             self.model = GPT2SimpleLMRole(config=UnifiedGPT2MediumConfig)
             self.model.load_state_dict(get_pretrained_states("unified-gpt2-medium-fp16"), strict=False)
 
-            self.original_model = GPT2SimpleLM(config=UnifiedGPT2MediumConfig)
-            self.original_model.load_state_dict(get_pretrained_states("unified-gpt2-medium-fp16"), strict=False)
-            utils.freeze_model(self.original_model)
         else:
             raise ValueError(args.model_size, " is not correct, use small or medium")  
+        
+        if args.kl_model_size == "small":
+            self.original_model = GPT2SimpleLM(UnifiedGPT2SmallConfig)
+            self.original_model.load_state_dict(get_pretrained_states("unified-gpt2-small"), strict=False)
+            utils.freeze_model(self.original_model)
+        elif args.kl_model_size == "medium":
+            self.original_model = GPT2SimpleLM(UnifiedGPT2MediumConfig)
+            self.original_model.load_state_dict(get_pretrained_states("unified-gpt2-medium-fp16"), strict=False)
+            utils.freeze_model(self.original_model)
+        elif args.kl_model_size == "large":
+            self.original_model = GPT2SimpleLM(UnifiedGPT2LargeConfig)
+            self.original_model.load_state_dict(get_pretrained_states("unified-gpt2-large-fp16"), strict=False)
+            utils.freeze_model(self.original_model)
+        elif args.kl_model_size == "xlarge":
+            self.original_model = GPT2SimpleLM(UnifiedGPT2LargeConfig)
+            self.original_model.load_state_dict(get_pretrained_states("unified-gpt2-xl-fp16"), strict=False)
+            utils.freeze_model(self.original_model)
 
         # process "transformers.wre.weight"
         model_state = self.model.state_dict()

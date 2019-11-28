@@ -23,7 +23,6 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset, SequentialSampler, RandomSampler
 from torch.utils.data.distributed import DistributedSampler
-from torch.nn.utils.rnn import pad_sequence
 
 from torchfly.utils import init_logging
 # from torchfly.modules.losses import SequenceCrossEntropyLoss
@@ -51,7 +50,7 @@ from model import HalfARDM
 init_logging()
 logger = logging.getLogger(__name__)
 
-pad_index = 1
+
 
 # tokenizer.encode("\n\n\n") [50140, 50118]
 # tokenizer.encode("A:")

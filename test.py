@@ -1,6 +1,26 @@
 from transformers import GPT2Tokenizer, GPT2LMHeadModel
 # model = GPT2LMHeadModel.from_pretrained("gpt")
 
+import json
+import tqdm
+
+import os
+os.rename(r"temp_in.jsonl", r"temp_out.jsonl")
+
+with open("original_train_ids.jsonl") as f:
+    with open("train_ids.jsonl", mode='w') as fin:
+        for i in f:
+            a = json.loads(i)
+            if len(a)<800:
+                fin.write(i)
+
+
+
+
+
+
+
+
 import gdown
 
 filepath = "/home/jinggu/united-medium"

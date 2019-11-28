@@ -7,13 +7,19 @@ import random
 import torch.jit
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.utils.data import Dataset
+import os
+import tqdm
+import json
+from torch.nn.utils.rnn import pad_sequence
 
+pad_index = 1
 
 class TextDataset(Dataset):
 
     def __init__(self, args, manager, file_path):
         assert os.path.isfile(file_path)
-        logger.info("Loading features from %s",
+        print("Loading features from %s",
                     file_path)
         
         self.args = args
@@ -142,6 +148,12 @@ def parse_args(argv=None):
     parser = argparse.ArgumentParser(description="")
 
     # add all arguments
+    parser.add_argument(
+        "--kl_model_size",
+        default="small",
+        type=str,       
+        help="You could choose small or medium, large, or xlarge"
+    )
     parser.add_argument(
         "--model_size",
         default="small",
