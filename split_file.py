@@ -12,10 +12,10 @@ import os
 
 def main():
     text = []
-    with open("train_ids.jsonl") as f:
+    with open("/home/ubuntu/train_ids.jsonl") as f:
         for i in tqdm.tqdm(f, total=original_length):
             a = json.loads(i)
-            if len(a)<800:
+            if len(a)<200:
                 text.append(i)
 
     length = len(text) // 8
