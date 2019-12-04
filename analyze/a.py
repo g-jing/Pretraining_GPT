@@ -31,7 +31,8 @@ class Analyze():
             # dialog_text = [['A', 'sentence1'], ['B', 'sentence2'], ['C', 'sentence3']]
             dialog_text = data[each_dialog][u'text']
             #print(dialog_text)
-            self.res['num_turns_each_dialog'] = len(dialog_text)
+            self.res['num_turns_each_dialog'][len(dialog_text)] = \
+                self.res['num_turns_each_dialog'].get(len(dialog_text), 0) + 1 
 
             length_cur_dialog = 0
             num_word_cur_dialog = 0
@@ -56,7 +57,7 @@ class Analyze():
             self.res['length_each_dialog'][length_cur_dialog] = \
                     self.res['length_each_dialog'].get(length_cur_dialog, 0) + 1
         
-        #pdb.set_trace()
+        pdb.set_trace()
         self._save()
 
     def _save(self):
