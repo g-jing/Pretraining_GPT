@@ -1,5 +1,5 @@
 import os, glob
-import json, string, json_lines
+import json, string, json_lines, time
 
 from tqdm import tqdm
 import pdb
@@ -24,11 +24,14 @@ class Analyze():
     def _process(self):
         with open(self._input_file, 'rb') as f: # opening file in binary(rb) mode    
             count = 0
+            # dialog_text = [ sentence1, sentence2, sentence3 ]
             for dialog_text in tqdm(json_lines.reader(f)):
+                """
                 #print(item)
-                #if len(item)>1:
-                #   print(item)
-                #   pdb.set_trace()
+                if len(dialog_text)>4:
+                    print(dialog_text)
+                    pdb.set_trace()
+                """
                 count += 1
                 self.res['num_turns_each_dialog'][len(dialog_text)] = \
                     self.res['num_turns_each_dialog'].get(len(dialog_text), 0) + 1 
@@ -58,7 +61,9 @@ class Analyze():
             
 
         pdb.set_trace()
+        start = time.time()
         self._save()
+        print('time: ', time.time() - start)
         
 
     def _save(self):

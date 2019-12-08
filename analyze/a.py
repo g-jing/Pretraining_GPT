@@ -1,5 +1,5 @@
 import os, glob
-import json, string
+import json, string, time
 from tqdm import tqdm
 import pdb
 
@@ -9,9 +9,9 @@ class Analyze():
         self._output_folder = output_folder
 
         self.res = {}
-        self.res['num_dialogs'] = 0             #
-        self.res['length_each_dialog'] = {}     # 
-        self.res['num_turns_each_dialog'] = {}  #
+        self.res['num_dialogs'] = 0             ##
+        self.res['length_each_dialog'] = {}     ## 
+        self.res['num_turns_each_dialog'] = {}  ##
         self.res['num_words_each_dialog'] = {}  #   
         self.res['num_words_each_turn'] = {}    #
         self.res['tokens'] = {}
@@ -57,8 +57,10 @@ class Analyze():
             self.res['length_each_dialog'][length_cur_dialog] = \
                     self.res['length_each_dialog'].get(length_cur_dialog, 0) + 1
         
-        pdb.set_trace()
+        #pdb.set_trace()
+        start = time.time()
         self._save()
+        print('time: ', time.time() - start)
 
     def _save(self):
         with open(os.path.join(self._output_folder, 'small.json'), 'w') as f:
